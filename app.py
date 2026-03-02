@@ -1,24 +1,64 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="GST Reconciliation System", layout="wide")
+# -------------------------
+# LOGIN CONFIGURATION
+# -------------------------
 
-st.title("Enterprise GST Reconciliation System")
+USER_CREDENTIALS = {
+    "admin": "admin123",
+    "staff1": "gst2026"
+}
 
-st.markdown("Upload GSTR-2B and Purchase Register files")
+# -------------------------
+# SESSION STATE CHECK
+# -------------------------
 
-gstr2b_file = st.file_uploader("Upload GSTR 2B File", type=["xlsx"])
-purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx"])
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-if gstr2b_file and purchase_file:
 
-    gstr2b = pd.read_excel(gstr2b_file)
-    purchase = pd.read_excel(purchase_file)
+# -------------------------
+# LOGIN SCREEN
+# -------------------------
 
-    gstr2b.columns = gstr2b.columns.str.strip()
-    purchase.columns = purchase.columns.str.strip()
+def login_screen():
+    st.title("🔐 GST System Login")
 
-    try:
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if username in USER_CREDENTIALS and USER_CREDENTIALS[username] == password:
+            st.session_state.logged_in = True
+            st.success("Login Successful")
+            st.rerun()
+        else:
+            st.error("Invalid Username or Password")
+
+
+# -------------------------
+# MAIN APP
+# -------------------------
+
+def main_app():
+    st.title("Enterprise GST Reconciliation System")
+
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.rerun()
+
+    gstr2b_file = st.file_uploader("Upload GSTR 2B File", type=["xlsx"])
+    purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx"])
+
+    if gstr2b_file and purchase_file:
+
+        gstr2b = pd.read_excel(gstr2b_file)
+        purchase = pd.read_excel(purchase_file)
+
+        gstr2b.columns = gstr2b.columns.str.strip()
+        purchase.columns = purchase.columns.str.strip()
+
         gstr2b["Invoice No"] = gstr2b["Invoice No"].astype(str).str.strip().str.upper()
         purchase["Bill No"] = purchase["Bill No"].astype(str).str.strip().str.upper()
 
@@ -45,7 +85,6 @@ if gstr2b_file and purchase_file:
         recon["Status"] = recon.apply(classify, axis=1)
 
         st.success("Reconciliation Completed")
-
         st.dataframe(recon, use_container_width=True)
 
         st.download_button(
@@ -55,5 +94,12 @@ if gstr2b_file and purchase_file:
             mime="text/csv"
         )
 
-    except Exception as e:
-        st.error(f"Column mismatch error: {e}")
+
+# -------------------------
+# APP FLOW CONTROL
+# -------------------------
+
+if not st.session_state.logged_in:
+    login_screen()
+else:
+    main_app()
