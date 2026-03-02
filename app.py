@@ -1,39 +1,60 @@
-# -------------------------
-# SMART COLUMN DETECTION
-# -------------------------
+if gstr2b_file and purchase_file:
 
-def find_column(columns, possible_names):
-    for col in columns:
-        if col.strip().lower() in possible_names:
-            return col
-    return None
+    # Load files FIRST
+    gstr2b = pd.read_excel(gstr2b_file)
+    purchase = pd.read_excel(purchase_file)
 
-gstr2b_columns = [c.strip().lower() for c in gstr2b.columns]
-purchase_columns = [c.strip().lower() for c in purchase.columns]
+    # Strip column spaces
+    gstr2b.columns = gstr2b.columns.str.strip()
+    purchase.columns = purchase.columns.str.strip()
 
-invoice_col_2b = find_column(gstr2b.columns, ["invoice no", "invoice number", "inv no", "document no"])
-invoice_col_pr = find_column(purchase.columns, ["bill no", "invoice no", "invoice number"])
+    # -------------------------
+    # SMART COLUMN DETECTION
+    # -------------------------
 
-gstin_col_2b = find_column(gstr2b.columns, ["gstin"])
-gstin_col_pr = find_column(purchase.columns, ["supplier gstin", "gstin"])
+    def find_column(columns, possible_names):
+        for col in columns:
+            if col.strip().lower() in possible_names:
+                return col
+        return None
 
-if not invoice_col_2b or not invoice_col_pr or not gstin_col_2b or not gstin_col_pr:
-    st.error("Required columns not found. Please check column names.")
-    st.stop()
+    invoice_col_2b = find_column(gstr2b.columns, ["invoice no", "invoice number", "inv no", "document no"])
+    invoice_col_pr = find_column(purchase.columns, ["bill no", "invoice no", "invoice number"])
 
-# Clean data
-gstr2b[invoice_col_2b] = gstr2b[invoice_col_2b].astype(str).str.strip().str.upper()
-purchase[invoice_col_pr] = purchase[invoice_col_pr].astype(str).str.strip().str.upper()
+    gstin_col_2b = find_column(gstr2b.columns, ["gstin"])
+    gstin_col_pr = find_column(purchase.columns, ["supplier gstin", "gstin"])
 
-gstr2b[gstin_col_2b] = gstr2b[gstin_col_2b].astype(str).str.strip()
-purchase[gstin_col_pr] = purchase[gstin_col_pr].astype(str).str.strip()
+    if not invoice_col_2b or not invoice_col_pr or not gstin_col_2b or not gstin_col_pr:
+        st.error("Required columns not found. Please check Excel column names.")
+        st.stop()
 
-# Merge
-recon = pd.merge(
-    purchase,
-    gstr2b,
-    left_on=[gstin_col_pr, invoice_col_pr],
-    right_on=[gstin_col_2b, invoice_col_2b],
-    how="outer",
-    indicator=True
-)
+    # Clean data
+    gstr2b[invoice_col_2b] = gstr2b[invoice_col_2b].astype(str).str.strip().str.upper()
+    purchase[invoice_col_pr] = purchase[invoice_col_pr].astype(str).str.strip().str.upper()
+
+    gstr2b[gstin_col_2b] = gstr2b[gstin_col_2b].astype(str).str.strip()
+    purchase[gstin_col_pr] = purchase[gstin_col_pr].astype(str).str.strip()
+
+    # Merge
+    recon = pd.merge(
+        purchase,
+        gstr2b,
+        left_on=[gstin_col_pr, invoice_col_pr],
+        right_on=[gstin_col_2b, invoice_col_2b],
+        how="outer",
+        indicator=True
+    )
+
+    # Classification
+    def classify(row):
+        if row["_merge"] == "both":
+            return "Matched"
+        elif row["_merge"] == "left_only":
+            return "In Purchase Not in 2B"
+        else:
+            return "In 2B Not in Purchase"
+
+    recon["Status"] = recon.apply(classify, axis=1)
+
+    st.success("Reconciliation Completed")
+    st.dataframe(recon, use_container_width=True)
