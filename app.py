@@ -1,33 +1,6 @@
 import streamlit as st
 import pandas as pd
 
-# -------------------------
-# LOGIN CONFIG
-# -------------------------
-
-USER_CREDENTIALS = {
-    "admin": "admin123",
-    "staff1": "gst2026"
-}
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-
-def login_screen():
-    st.title("🔐 GST System Login")
-
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        if username in USER_CREDENTIALS and USER_CREDENTIALS[username] == password:
-            st.session_state.logged_in = True
-            st.rerun()
-        else:
-            st.error("Invalid Username or Password")
-
-
 def main_app():
     st.title("Enterprise GST Reconciliation System")
 
