@@ -127,49 +127,50 @@ if gstr2b_file and purchase_file:
     # Merge
     recon = pd.merge(df_pr, df_2b, on=["GSTIN", "Invoice"], how="outer", indicator=True)
 
-    # Differences
-    recon["Taxable_Diff"] = recon["Taxable_PR"] - recon["Taxable_2B"]
-    recon["IGST_Diff"] = recon["IGST_PR"] - recon["IGST_2B"]
-    recon["CGST_Diff"] = recon["CGST_PR"] - recon["CGST_2B"]
-    recon["SGST_Diff"] = recon["SGST_PR"] - recon["SGST_2B"]
 
     # Reason Logic
-    def reason(row):
-        if row["_merge"] == "left_only":
-            return "Missing in 2B"
-        if row["_merge"] == "right_only":
-            return "Missing in Purchase"
+    recon = recon.drop(columns=["_merge"])
 
-        issues = []
+# -------------------------------------------------
+# PROFESSIONAL STATUS + REASON LOGIC
+# -------------------------------------------------
 
-        if row["Taxable_Diff"] != 0:
-            issues.append("Taxable Mismatch")
-        if row["IGST_Diff"] != 0:
-            issues.append("IGST Mismatch")
-        if row["CGST_Diff"] != 0:
-            issues.append("CGST Mismatch")
-        if row["SGST_Diff"] != 0:
-            issues.append("SGST Mismatch")
+def generate_status_reason(row):
 
-        if not issues:
-            return "Matched"
+    # Missing cases
+    if row["_merge"] == "left_only":
+        return pd.Series(["Mismatch", "Missing in 2B"])
 
-        return ", ".join(issues)
+    if row["_merge"] == "right_only":
+        return pd.Series(["Mismatch", "Missing in Purchase Register"])
 
-    recon["Status"] = recon.apply(reason, axis=1)
+    reasons = []
 
-    st.subheader("Summary")
-    st.write(recon["Status"].value_counts())
+    # Date mismatch
+    if pd.notna(row["Date_PR"]) and pd.notna(row["Date_2B"]):
+        if row["Date_PR"] != row["Date_2B"]:
+            reasons.append("Invoice Date Mismatch")
 
-    st.subheader("Detailed Output")
-    st.dataframe(recon, use_container_width=True)
+    # Taxable mismatch
+    if round(row["Taxable_PR"],2) != round(row["Taxable_2B"],2):
+        reasons.append("Taxable Value Mismatch")
 
-    recon.to_excel("GST_Reconciliation_Output.xlsx", index=False)
+    # IGST mismatch
+    if round(row["IGST_PR"],2) != round(row["IGST_2B"],2):
+        reasons.append("IGST Mismatch")
 
-    with open("GST_Reconciliation_Output.xlsx", "rb") as f:
-        st.download_button(
-            "Download Excel Report",
-            data=f,
-            file_name="GST_Reconciliation_Output.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    # CGST mismatch
+    if round(row["CGST_PR"],2) != round(row["CGST_2B"],2):
+        reasons.append("CGST Mismatch")
+
+    # SGST mismatch
+    if round(row["SGST_PR"],2) != round(row["SGST_2B"],2):
+        reasons.append("SGST Mismatch")
+
+    if len(reasons) == 0:
+        return pd.Series(["Matched", ""])
+
+    return pd.Series(["Mismatch", ", ".join(reasons)])
+
+
+recon[["Status", "Reason"]] = recon.apply(generate_status_reason, axis=1)
