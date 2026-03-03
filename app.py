@@ -2,19 +2,18 @@ import streamlit as st
 import pandas as pd
 import re
 
-st.set_page_config(page_title="GST Reconciliation", layout="wide")
-st.title("GST Reconciliation - Enterprise Version")
-
+st.set_page_config(page_title="GST Reconciliation System", layout="wide")
+st.title("Enterprise GST Reconciliation System")
 
 gstr2b_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx"])
 
 
-# ------------------------------------------------------
-# CLEAN FUNCTION
-# ------------------------------------------------------
+# ----------------------------------------------------------
+# CLEAN FUNCTIONS
+# ----------------------------------------------------------
 
-def clean_col(col):
+def clean_column(col):
     col = str(col).lower()
     col = col.replace("₹", "")
     col = re.sub(r'[^a-z0-9]', '', col)
@@ -29,15 +28,15 @@ def find_column(mapping, keywords):
     return None
 
 
-# ------------------------------------------------------
-# LOAD B2B SHEET SAFELY
-# ------------------------------------------------------
+# ----------------------------------------------------------
+# LOAD B2B SHEET (AUTO HEADER DETECT)
+# ----------------------------------------------------------
 
 def load_b2b(file):
     excel = pd.ExcelFile(file)
 
     if "B2B" not in excel.sheet_names:
-        st.error("B2B sheet not found.")
+        st.error("B2B sheet not found in GSTR-2B file.")
         st.stop()
 
     raw = excel.parse("B2B", header=None)
@@ -49,7 +48,7 @@ def load_b2b(file):
             break
 
     if header_row is None:
-        st.error("Header not detected in B2B sheet.")
+        st.error("Could not detect header row in B2B sheet.")
         st.stop()
 
     df = excel.parse("B2B", header=header_row)
@@ -57,20 +56,22 @@ def load_b2b(file):
     return df
 
 
-# ------------------------------------------------------
+# ----------------------------------------------------------
 # MAIN PROCESS
-# ------------------------------------------------------
+# ----------------------------------------------------------
 
 if gstr2b_file and purchase_file:
 
+    # Load files
     gstr2b = load_b2b(gstr2b_file)
     purchase = pd.read_excel(purchase_file)
     purchase.columns = purchase.columns.str.strip()
 
-    g2b_map = {col: clean_col(col) for col in gstr2b.columns}
-    pr_map = {col: clean_col(col) for col in purchase.columns}
+    # Create column maps
+    g2b_map = {col: clean_column(col) for col in gstr2b.columns}
+    pr_map = {col: clean_column(col) for col in purchase.columns}
 
-    # Flexible matching
+    # Detect required columns dynamically
     gstin_2b = find_column(g2b_map, ["gstin"])
     invoice_2b = find_column(g2b_map, ["invoice", "doc"])
     date_2b = find_column(g2b_map, ["date"])
@@ -82,22 +83,23 @@ if gstr2b_file and purchase_file:
     gstin_pr = find_column(pr_map, ["gstin"])
     invoice_pr = find_column(pr_map, ["supplierinvoice", "invoice"])
     date_pr = find_column(pr_map, ["date"])
-    taxable_pr = find_column(pr_map, ["taxable", "value", "gross"])
+    taxable_pr = find_column(pr_map, ["taxable", "gross", "value"])
     igst_pr = find_column(pr_map, ["igst"])
     cgst_pr = find_column(pr_map, ["cgst"])
     sgst_pr = find_column(pr_map, ["sgst"])
 
+    # Validation
     if not gstin_2b or not invoice_2b:
-        st.error("Invoice or GSTIN column not found in GSTR-2B.")
+        st.error("Required columns not found in GSTR-2B.")
         st.write("Available columns:", gstr2b.columns)
         st.stop()
 
     if not gstin_pr or not invoice_pr:
-        st.error("Invoice or GSTIN column not found in Purchase Register.")
+        st.error("Required columns not found in Purchase Register.")
         st.write("Available columns:", purchase.columns)
         st.stop()
 
-    # Build DataFrames safely
+    # Build clean DataFrames
     df_2b = pd.DataFrame({
         "GSTIN": gstr2b[gstin_2b],
         "Invoice": gstr2b[invoice_2b],
@@ -127,50 +129,57 @@ if gstr2b_file and purchase_file:
     # Merge
     recon = pd.merge(df_pr, df_2b, on=["GSTIN", "Invoice"], how="outer", indicator=True)
 
+    # Status + Reason Logic
+    def generate_status_reason(row):
 
-    # Reason Logic
+        if row["_merge"] == "left_only":
+            return pd.Series(["Mismatch", "Missing in 2B"])
+
+        if row["_merge"] == "right_only":
+            return pd.Series(["Mismatch", "Missing in Purchase Register"])
+
+        reasons = []
+
+        if pd.notna(row["Date_PR"]) and pd.notna(row["Date_2B"]):
+            if row["Date_PR"] != row["Date_2B"]:
+                reasons.append("Invoice Date Mismatch")
+
+        if round(row["Taxable_PR"],2) != round(row["Taxable_2B"],2):
+            reasons.append("Taxable Value Mismatch")
+
+        if round(row["IGST_PR"],2) != round(row["IGST_2B"],2):
+            reasons.append("IGST Mismatch")
+
+        if round(row["CGST_PR"],2) != round(row["CGST_2B"],2):
+            reasons.append("CGST Mismatch")
+
+        if round(row["SGST_PR"],2) != round(row["SGST_2B"],2):
+            reasons.append("SGST Mismatch")
+
+        if len(reasons) == 0:
+            return pd.Series(["Matched", ""])
+
+        return pd.Series(["Mismatch", ", ".join(reasons)])
+
+    recon[["Status", "Reason"]] = recon.apply(generate_status_reason, axis=1)
+
     recon = recon.drop(columns=["_merge"])
 
-# -------------------------------------------------
-# PROFESSIONAL STATUS + REASON LOGIC
-# -------------------------------------------------
+    # Summary
+    st.subheader("Reconciliation Summary")
+    st.write(recon["Status"].value_counts())
 
-def generate_status_reason(row):
+    st.subheader("Detailed Reconciliation")
+    st.dataframe(recon, use_container_width=True)
 
-    # Missing cases
-    if row["_merge"] == "left_only":
-        return pd.Series(["Mismatch", "Missing in 2B"])
+    # Export
+    output_file = "GST_Reconciliation_Output.xlsx"
+    recon.to_excel(output_file, index=False)
 
-    if row["_merge"] == "right_only":
-        return pd.Series(["Mismatch", "Missing in Purchase Register"])
-
-    reasons = []
-
-    # Date mismatch
-    if pd.notna(row["Date_PR"]) and pd.notna(row["Date_2B"]):
-        if row["Date_PR"] != row["Date_2B"]:
-            reasons.append("Invoice Date Mismatch")
-
-    # Taxable mismatch
-    if round(row["Taxable_PR"],2) != round(row["Taxable_2B"],2):
-        reasons.append("Taxable Value Mismatch")
-
-    # IGST mismatch
-    if round(row["IGST_PR"],2) != round(row["IGST_2B"],2):
-        reasons.append("IGST Mismatch")
-
-    # CGST mismatch
-    if round(row["CGST_PR"],2) != round(row["CGST_2B"],2):
-        reasons.append("CGST Mismatch")
-
-    # SGST mismatch
-    if round(row["SGST_PR"],2) != round(row["SGST_2B"],2):
-        reasons.append("SGST Mismatch")
-
-    if len(reasons) == 0:
-        return pd.Series(["Matched", ""])
-
-    return pd.Series(["Mismatch", ", ".join(reasons)])
-
-
-recon[["Status", "Reason"]] = recon.apply(generate_status_reason, axis=1)
+    with open(output_file, "rb") as f:
+        st.download_button(
+            "Download Excel Report",
+            data=f,
+            file_name="GST_Reconciliation_Output.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
