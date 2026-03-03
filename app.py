@@ -9,11 +9,61 @@ gstr2b_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register File (Raw Data Only)", type=["xlsx"])
 
 
-# ----------------------------------------------------------
-# CLEAN COLUMN NAMES
-# ----------------------------------------------------------
+# -------------------------------------------------------------
+# FIND REAL HEADER ROW IN GSTR2B
+# -------------------------------------------------------------
 
-def clean_column(col):
+def load_real_gstr2b(file):
+    raw = pd.read_excel(file, header=None)
+
+    header_row = None
+
+    for i in range(len(raw)):
+        row = raw.iloc[i].astype(str).str.lower()
+
+        if row.str.contains("gstin of supplier").any():
+            header_row = i
+            break
+
+    if header_row is None:
+        st.error("Could not locate B2B table inside GSTR-2B file.")
+        st.stop()
+
+    df = pd.read_excel(file, header=header_row)
+    df.columns = df.columns.str.strip()
+    return df
+
+
+# -------------------------------------------------------------
+# FIND PURCHASE HEADER ROW
+# -------------------------------------------------------------
+
+def load_real_purchase(file):
+    raw = pd.read_excel(file, header=None)
+
+    header_row = None
+
+    for i in range(len(raw)):
+        row = raw.iloc[i].astype(str).str.lower()
+
+        if row.str.contains("supplier invoice").any() and row.str.contains("gstin").any():
+            header_row = i
+            break
+
+    if header_row is None:
+        st.error("Upload RAW Purchase Register sheet (not Pivot).")
+        st.stop()
+
+    df = pd.read_excel(file, header=header_row)
+    df.columns = df.columns.str.strip()
+    return df
+
+
+# -------------------------------------------------------------
+# CLEAN COLUMN NAME
+# -------------------------------------------------------------
+
+def clean(col):
     col = str(col)
     col = col.lower()
     col = col.replace("₹", "")
@@ -22,129 +72,78 @@ def clean_column(col):
     return col
 
 
-def map_columns(df):
-    mapping = {}
-    for col in df.columns:
-        mapping[col] = clean_column(col)
-    return mapping
-
-
-# ----------------------------------------------------------
-# LOAD GSTR2B - ONLY B2B SHEET
-# ----------------------------------------------------------
-
-def load_gstr2b(file):
-    excel = pd.ExcelFile(file)
-
-    if "B2B" not in excel.sheet_names:
-        st.error("B2B sheet not found in GSTR-2B file.")
-        st.write("Available sheets:", excel.sheet_names)
-        st.stop()
-
-    df = excel.parse("B2B")
-    df.columns = df.columns.str.strip()
-    return df
-
-
-# ----------------------------------------------------------
+# -------------------------------------------------------------
 # MAIN LOGIC
-# ----------------------------------------------------------
+# -------------------------------------------------------------
 
 if gstr2b_file and purchase_file:
 
-    gstr2b = load_gstr2b(gstr2b_file)
-    purchase = pd.read_excel(purchase_file)
+    gstr2b = load_real_gstr2b(gstr2b_file)
+    purchase = load_real_purchase(purchase_file)
 
-    gstr2b.columns = gstr2b.columns.str.strip()
-    purchase.columns = purchase.columns.str.strip()
+    g2b_map = {col: clean(col) for col in gstr2b.columns}
+    pr_map = {col: clean(col) for col in purchase.columns}
 
-    g2b_map = map_columns(gstr2b)
-    pr_map = map_columns(purchase)
-
-    # Required from GSTR-2B
-    required_2b = {
-        "gstinofsupplier": None,
-        "tradellegalname": None,
-        "invoicenumber": None,
-        "invoicedate": None,
-        "taxablevalue": None,
-        "integratedtax": None,
-        "centraltax": None,
-        "stateuttax": None
-    }
+    # Required from GSTR2B
+    gstin_2b = next((c for c, v in g2b_map.items() if "gstinofsupplier" in v), None)
+    invoice_2b = next((c for c, v in g2b_map.items() if "invoicenumber" in v), None)
+    date_2b = next((c for c, v in g2b_map.items() if "invoicedate" in v), None)
+    taxable_2b = next((c for c, v in g2b_map.items() if "taxablevalue" in v), None)
+    igst_2b = next((c for c, v in g2b_map.items() if "integratedtax" in v), None)
+    cgst_2b = next((c for c, v in g2b_map.items() if "centraltax" in v), None)
+    sgst_2b = next((c for c, v in g2b_map.items() if "stateuttax" in v), None)
 
     # Required from Purchase
-    required_pr = {
-        "gstinuin": None,
-        "particulars": None,
-        "supplierinvoiceno": None,
-        "date": None,
-        "taxableamount": None,
-        "igst": None,
-        "cgst": None,
-        "sgst": None
-    }
+    gstin_pr = next((c for c, v in pr_map.items() if "gstinuin" in v or "gstin" in v), None)
+    invoice_pr = next((c for c, v in pr_map.items() if "supplierinvoiceno" in v), None)
+    date_pr = next((c for c, v in pr_map.items() if v == "date"), None)
+    taxable_pr = next((c for c, v in pr_map.items() if "taxableamount" in v), None)
+    igst_pr = next((c for c, v in pr_map.items() if v == "igst"), None)
+    cgst_pr = next((c for c, v in pr_map.items() if v == "cgst"), None)
+    sgst_pr = next((c for c, v in pr_map.items() if v == "sgst"), None)
 
-    # Match columns dynamically
-    for col, clean in g2b_map.items():
-        for key in required_2b:
-            if key in clean:
-                required_2b[key] = col
-
-    for col, clean in pr_map.items():
-        for key in required_pr:
-            if key in clean:
-                required_pr[key] = col
-
-    # Validate essential fields
-    if not required_2b["gstinofsupplier"] or not required_2b["invoicenumber"]:
+    if not gstin_2b or not invoice_2b:
         st.error("Required columns missing in GSTR-2B.")
         st.write(gstr2b.columns)
         st.stop()
 
-    if not required_pr["gstinuin"] or not required_pr["supplierinvoiceno"]:
-        st.error("Required columns missing in Purchase Register. Please upload RAW data sheet (not pivot).")
+    if not gstin_pr or not invoice_pr:
+        st.error("Required columns missing in Purchase Register.")
         st.write(purchase.columns)
         st.stop()
 
-    # Build clean datasets
+    # Build clean tables
     df_2b = pd.DataFrame({
-        "GSTIN": gstr2b[required_2b["gstinofsupplier"]],
-        "Invoice": gstr2b[required_2b["invoicenumber"]],
-        "Date": gstr2b[required_2b["invoicedate"]],
-        "Taxable_2B": pd.to_numeric(gstr2b[required_2b["taxablevalue"]], errors="coerce").fillna(0),
-        "IGST_2B": pd.to_numeric(gstr2b[required_2b["integratedtax"]], errors="coerce").fillna(0),
-        "CGST_2B": pd.to_numeric(gstr2b[required_2b["centraltax"]], errors="coerce").fillna(0),
-        "SGST_2B": pd.to_numeric(gstr2b[required_2b["stateuttax"]], errors="coerce").fillna(0)
+        "GSTIN": gstr2b[gstin_2b],
+        "Invoice": gstr2b[invoice_2b],
+        "Taxable_2B": pd.to_numeric(gstr2b[taxable_2b], errors="coerce").fillna(0),
+        "IGST_2B": pd.to_numeric(gstr2b[igst_2b], errors="coerce").fillna(0),
+        "CGST_2B": pd.to_numeric(gstr2b[cgst_2b], errors="coerce").fillna(0),
+        "SGST_2B": pd.to_numeric(gstr2b[sgst_2b], errors="coerce").fillna(0)
     })
 
     df_pr = pd.DataFrame({
-        "GSTIN": purchase[required_pr["gstinuin"]],
-        "Invoice": purchase[required_pr["supplierinvoiceno"]],
-        "Date": purchase[required_pr["date"]],
-        "Taxable_PR": pd.to_numeric(purchase[required_pr["taxableamount"]], errors="coerce").fillna(0),
-        "IGST_PR": pd.to_numeric(purchase[required_pr["igst"]], errors="coerce").fillna(0),
-        "CGST_PR": pd.to_numeric(purchase[required_pr["cgst"]], errors="coerce").fillna(0),
-        "SGST_PR": pd.to_numeric(purchase[required_pr["sgst"]], errors="coerce").fillna(0)
+        "GSTIN": purchase[gstin_pr],
+        "Invoice": purchase[invoice_pr],
+        "Taxable_PR": pd.to_numeric(purchase[taxable_pr], errors="coerce").fillna(0),
+        "IGST_PR": pd.to_numeric(purchase[igst_pr], errors="coerce").fillna(0),
+        "CGST_PR": pd.to_numeric(purchase[cgst_pr], errors="coerce").fillna(0),
+        "SGST_PR": pd.to_numeric(purchase[sgst_pr], errors="coerce").fillna(0)
     })
 
-    # Clean matching keys
     df_2b["Invoice"] = df_2b["Invoice"].astype(str).str.strip().str.upper()
     df_pr["Invoice"] = df_pr["Invoice"].astype(str).str.strip().str.upper()
 
     df_2b["GSTIN"] = df_2b["GSTIN"].astype(str).str.strip()
     df_pr["GSTIN"] = df_pr["GSTIN"].astype(str).str.strip()
 
-    # Merge
     recon = pd.merge(df_pr, df_2b, on=["GSTIN", "Invoice"], how="outer", indicator=True)
 
-    # Difference
     recon["Taxable_Diff"] = recon["Taxable_PR"] - recon["Taxable_2B"]
     recon["IGST_Diff"] = recon["IGST_PR"] - recon["IGST_2B"]
     recon["CGST_Diff"] = recon["CGST_PR"] - recon["CGST_2B"]
     recon["SGST_Diff"] = recon["SGST_PR"] - recon["SGST_2B"]
 
-    # Status
     def classify(row):
         if row["_merge"] == "both":
             if row["Taxable_Diff"] != 0 or row["IGST_Diff"] != 0 or \
@@ -158,19 +157,15 @@ if gstr2b_file and purchase_file:
 
     recon["Status"] = recon.apply(classify, axis=1)
 
-    st.subheader("Reconciliation Summary")
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Matched", (recon["Status"] == "Matched").sum())
-    col2.metric("Tax Mismatch", (recon["Status"] == "Tax Mismatch").sum())
-    col3.metric("Missing in 2B", (recon["Status"] == "Missing in 2B").sum())
+    st.subheader("Summary")
+    st.write(recon["Status"].value_counts())
 
     st.subheader("Detailed Reconciliation")
     st.dataframe(recon, use_container_width=True)
 
     st.download_button(
-        "Download Reconciliation Report",
+        "Download Reconciliation",
         data=recon.to_csv(index=False),
-        file_name="GST_Reconciliation_Report.csv",
+        file_name="GST_Reconciliation.csv",
         mime="text/csv"
     )
