@@ -140,9 +140,6 @@ if gstr2b_file and purchase_file:
 
         reasons = []
 
-        if pd.notna(row["Date_PR"]) and pd.notna(row["Date_2B"]):
-            if row["Date_PR"] != row["Date_2B"]:
-                reasons.append("Invoice Date Mismatch")
 
         if round(row["Taxable_PR"],2) != round(row["Taxable_2B"],2):
             reasons.append("Taxable Value Mismatch")
