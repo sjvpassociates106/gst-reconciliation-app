@@ -9,29 +9,38 @@ purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx"])
 
 
 # -------------------------------------------------------
-# AUTO DETECT HEADER ROW FUNCTION
+# AUTO HEADER SEARCH FUNCTION (STRONG VERSION)
 # -------------------------------------------------------
 
-def detect_header_row(file, required_keywords):
+def smart_read_excel(file, required_words):
+    # Read entire sheet without header
     raw = pd.read_excel(file, header=None)
+
+    header_row = None
 
     for i in range(len(raw)):
         row = raw.iloc[i].astype(str).str.lower()
 
         match_count = 0
-        for keyword in required_keywords:
-            if row.str.contains(keyword).any():
+        for word in required_words:
+            if row.str.contains(word).any():
                 match_count += 1
 
-        if match_count >= 2:  # at least 2 required words found
-            return i
+        if match_count >= 2:  # minimum 2 matches
+            header_row = i
+            break
 
-    return None
+    # If still not found → assume first non-empty row
+    if header_row is None:
+        for i in range(len(raw)):
+            if raw.iloc[i].notna().sum() > 3:
+                header_row = i
+                break
 
+    df = pd.read_excel(file, header=header_row)
+    df.columns = df.columns.astype(str).str.strip()
+    return df
 
-# -------------------------------------------------------
-# FIND COLUMN BY KEYWORDS
-# -------------------------------------------------------
 
 def find_column(columns, keywords):
     for col in columns:
@@ -48,36 +57,11 @@ def find_column(columns, keywords):
 
 if gstr2b_file and purchase_file:
 
-    # Detect header rows
-    gstr2b_header = detect_header_row(
-        gstr2b_file,
-        ["gstin", "invoice", "taxable"]
-    )
+    # Load intelligently
+    gstr2b = smart_read_excel(gstr2b_file, ["gstin", "invoice", "taxable"])
+    purchase = smart_read_excel(purchase_file, ["date", "invoice", "gstin"])
 
-    purchase_header = detect_header_row(
-        purchase_file,
-        ["date", "invoice", "gstin"]
-    )
-
-    if gstr2b_header is None:
-        st.error("Could not detect GSTR-2B header row automatically.")
-        st.stop()
-
-    if purchase_header is None:
-        st.error("Could not detect Purchase Register header row automatically.")
-        st.stop()
-
-    # Load with correct headers
-    gstr2b = pd.read_excel(gstr2b_file, header=gstr2b_header)
-    purchase = pd.read_excel(purchase_file, header=purchase_header)
-
-    gstr2b.columns = gstr2b.columns.astype(str).str.strip()
-    purchase.columns = purchase.columns.astype(str).str.strip()
-
-    # -------------------------------------------------------
-    # DETECT REQUIRED COLUMNS FROM 2B
-    # -------------------------------------------------------
-
+    # Detect columns from GSTR-2B
     gstin_2b = find_column(gstr2b.columns, ["gstin"])
     invoice_2b = find_column(gstr2b.columns, ["invoice"])
     date_2b = find_column(gstr2b.columns, ["date"])
@@ -86,33 +70,22 @@ if gstr2b_file and purchase_file:
     cgst_2b = find_column(gstr2b.columns, ["central", "cgst"])
     sgst_2b = find_column(gstr2b.columns, ["state", "sgst"])
 
-    # -------------------------------------------------------
-    # DETECT REQUIRED COLUMNS FROM PURCHASE
-    # -------------------------------------------------------
-
+    # Detect columns from Purchase Register
     gstin_pr = find_column(purchase.columns, ["gstin"])
     invoice_pr = find_column(purchase.columns, ["supplierinvoiceno", "invoice"])
     date_pr = find_column(purchase.columns, ["date"])
+    taxable_pr = find_column(purchase.columns, ["taxable", "value", "gross"])
     igst_pr = find_column(purchase.columns, ["igst"])
     cgst_pr = find_column(purchase.columns, ["cgst"])
     sgst_pr = find_column(purchase.columns, ["sgst"])
-    taxable_pr = find_column(purchase.columns, ["taxable", "value", "gross"])
 
-    # Basic required validation
-    if not gstin_2b or not invoice_2b:
-        st.error("Required columns missing in GSTR-2B.")
-        st.write(gstr2b.columns)
+    if not gstin_2b or not invoice_2b or not gstin_pr or not invoice_pr:
+        st.error("Required reconciliation columns not found.")
+        st.write("2B Columns:", gstr2b.columns)
+        st.write("Purchase Columns:", purchase.columns)
         st.stop()
 
-    if not gstin_pr or not invoice_pr:
-        st.error("Required columns missing in Purchase Register.")
-        st.write(purchase.columns)
-        st.stop()
-
-    # -------------------------------------------------------
-    # BUILD CLEAN DATAFRAMES (IGNORE OTHER COLUMNS)
-    # -------------------------------------------------------
-
+    # Build working data
     df_2b = pd.DataFrame({
         "GSTIN": gstr2b[gstin_2b],
         "Invoice": gstr2b[invoice_2b],
@@ -133,19 +106,16 @@ if gstr2b_file and purchase_file:
         "SGST_PR": pd.to_numeric(purchase[sgst_pr], errors="coerce").fillna(0) if sgst_pr else 0
     })
 
-    # Clean keys
+    # Clean matching fields
     df_2b["Invoice"] = df_2b["Invoice"].astype(str).str.strip().str.upper()
     df_pr["Invoice"] = df_pr["Invoice"].astype(str).str.strip().str.upper()
-
     df_2b["GSTIN"] = df_2b["GSTIN"].astype(str).str.strip()
     df_pr["GSTIN"] = df_pr["GSTIN"].astype(str).str.strip()
 
-    # -------------------------------------------------------
-    # MERGE
-    # -------------------------------------------------------
-
+    # Merge
     recon = pd.merge(df_pr, df_2b, on=["GSTIN", "Invoice"], how="outer", indicator=True)
 
+    # Differences
     recon["Taxable_Diff"] = recon["Taxable_PR"] - recon["Taxable_2B"]
     recon["IGST_Diff"] = recon["IGST_PR"] - recon["IGST_2B"]
     recon["CGST_Diff"] = recon["CGST_PR"] - recon["CGST_2B"]
@@ -165,17 +135,14 @@ if gstr2b_file and purchase_file:
 
     recon["Status"] = recon.apply(classify, axis=1)
 
-    # -------------------------------------------------------
-    # OUTPUT
-    # -------------------------------------------------------
-
+    # Summary
     st.subheader("Reconciliation Summary")
-
     col1, col2, col3 = st.columns(3)
     col1.metric("Matched", (recon["Status"] == "Matched").sum())
     col2.metric("Tax Mismatch", (recon["Status"] == "Tax Mismatch").sum())
     col3.metric("Missing in 2B", (recon["Status"] == "Missing in 2B").sum())
 
+    # Output
     st.subheader("Detailed Reconciliation")
     st.dataframe(recon, use_container_width=True)
 
