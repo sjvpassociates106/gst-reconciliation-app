@@ -9,9 +9,7 @@ gstr2b_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx","xls"])
 purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx","xls"])
 
 
-# -------------------------
-# CLEAN COLUMN NAME
-# -------------------------
+# ---------- CLEAN COLUMN ----------
 def clean(text):
     text=str(text).lower()
     text=text.replace("₹","")
@@ -19,24 +17,27 @@ def clean(text):
     return text
 
 
-# -------------------------
-# FIND COLUMN
-# -------------------------
+# ---------- FIND COLUMN ----------
 def find_col(columns,keywords):
 
     for col in columns:
         c=clean(col)
 
-        for key in keywords:
-            if key in c:
+        for k in keywords:
+            if k in c:
                 return col
 
     return None
 
 
-# -------------------------
-# LOAD GSTR2B B2B SHEET
-# -------------------------
+# ---------- SAFE COLUMN ----------
+def safe_numeric(df,col):
+    if col and col in df.columns:
+        return pd.to_numeric(df[col],errors="coerce").fillna(0)
+    return 0
+
+
+# ---------- LOAD GSTR2B ----------
 def load_gstr2b(file):
 
     excel=pd.ExcelFile(file)
@@ -47,67 +48,58 @@ def load_gstr2b(file):
 
     raw=excel.parse("B2B",header=None)
 
-    header_row=None
+    header=None
 
     for i in range(len(raw)):
-
-        row=raw.iloc[i].astype(str).str.lower()
-
-        if any("gstin" in x for x in row):
-            header_row=i
+        if raw.iloc[i].astype(str).str.contains("gstin",case=False).any():
+            header=i
             break
 
-    if header_row is None:
-        header_row=0
+    if header is None:
+        header=0
 
-    df=excel.parse("B2B",header=header_row)
+    df=excel.parse("B2B",header=header)
     df.columns=df.columns.str.strip()
 
     return df
 
 
-# -------------------------
-# LOAD PURCHASE REGISTER
-# -------------------------
+# ---------- LOAD PURCHASE ----------
 def load_purchase(file):
 
     raw=pd.read_excel(file,header=None)
 
-    header_row=None
+    header=None
 
     for i in range(len(raw)):
-
         row=raw.iloc[i].astype(str).str.lower()
 
         if any("gstin" in x for x in row) or any("invoice" in x for x in row):
-            header_row=i
+            header=i
             break
 
-    if header_row is None:
-        header_row=0
+    if header is None:
+        header=0
 
-    df=pd.read_excel(file,header=header_row)
+    df=pd.read_excel(file,header=header)
     df.columns=df.columns.str.strip()
 
     return df
 
 
-# -------------------------
-# MAIN PROCESS
-# -------------------------
+# ---------- MAIN ----------
 if gstr2b_file and purchase_file:
 
     gstr2b=load_gstr2b(gstr2b_file)
     purchase=load_purchase(purchase_file)
 
-
     # Detect columns
     gstin2b=find_col(gstr2b.columns,["gstin"])
     inv2b=find_col(gstr2b.columns,["invoice"])
     tax2b=find_col(gstr2b.columns,["taxable"])
-    igst2b=find_col(gstr2b.columns,["igst","integrated"])
-    cgst2b=find_col(gstr2b.columns,["cgst","central"])
-    sgst2b=find_col(gstr2b.columns,["sgst","state"])
+    igst2b=find_col(gstr2b.columns,["integrated","igst"])
+    cgst2b=find_col(gstr2b.columns,["central","cgst"])
+    sgst2b=find_col(gstr2b.columns,["state","sgst"])
 
     gstinpr=find_col(purchase.columns,["gstin"])
     invpr=find_col(purchase.columns,["supplierinvoice","invoice"])
@@ -117,15 +109,15 @@ if gstr2b_file and purchase_file:
     sgstpr=find_col(purchase.columns,["sgst"])
 
 
-    # Standard tables
+    # ---------- STANDARD TABLES ----------
     df2b=pd.DataFrame({
 
         "GSTIN":gstr2b[gstin2b].astype(str).str.strip().str.upper(),
         "Invoice":gstr2b[inv2b].astype(str).str.strip().str.upper(),
-        "Taxable2B":pd.to_numeric(gstr2b[tax2b],errors="coerce").fillna(0),
-        "IGST2B":pd.to_numeric(gstr2b[igst2b],errors="coerce").fillna(0),
-        "CGST2B":pd.to_numeric(gstr2b[cgst2b],errors="coerce").fillna(0),
-        "SGST2B":pd.to_numeric(gstr2b[sgst2b],errors="coerce").fillna(0)
+        "Taxable2B":safe_numeric(gstr2b,tax2b),
+        "IGST2B":safe_numeric(gstr2b,igst2b),
+        "CGST2B":safe_numeric(gstr2b,cgst2b),
+        "SGST2B":safe_numeric(gstr2b,sgst2b)
 
     })
 
@@ -134,40 +126,40 @@ if gstr2b_file and purchase_file:
 
         "GSTIN":purchase[gstinpr].astype(str).str.strip().str.upper(),
         "Invoice":purchase[invpr].astype(str).str.strip().str.upper(),
-        "TaxablePR":pd.to_numeric(purchase[taxpr],errors="coerce").fillna(0),
-        "IGSTPR":pd.to_numeric(purchase[igstpr],errors="coerce").fillna(0),
-        "CGSTPR":pd.to_numeric(purchase[cgstpr],errors="coerce").fillna(0),
-        "SGSTPR":pd.to_numeric(purchase[sgstpr],errors="coerce").fillna(0)
+        "TaxablePR":safe_numeric(purchase,taxpr),
+        "IGSTPR":safe_numeric(purchase,igstpr),
+        "CGSTPR":safe_numeric(purchase,cgstpr),
+        "SGSTPR":safe_numeric(purchase,sgstpr)
 
     })
 
 
-    # Merge
+    # ---------- MERGE ----------
     recon=pd.merge(dfpr,df2b,on=["GSTIN","Invoice"],how="outer",indicator=True)
 
 
-    # Status logic
+    # ---------- STATUS ----------
     def status(row):
 
         if row["_merge"]=="left_only":
             return pd.Series(["Mismatch","Missing in 2B"])
 
         if row["_merge"]=="right_only":
-            return pd.Series(["Mismatch","Missing in Purchase Register"])
+            return pd.Series(["Mismatch","Missing in Purchase"])
 
         reasons=[]
 
         if round(row["TaxablePR"],2)!=round(row["Taxable2B"],2):
-            reasons.append("Taxable Value Mismatch")
+            reasons.append("Taxable mismatch")
 
         if round(row["IGSTPR"],2)!=round(row["IGST2B"],2):
-            reasons.append("IGST Mismatch")
+            reasons.append("IGST mismatch")
 
         if round(row["CGSTPR"],2)!=round(row["CGST2B"],2):
-            reasons.append("CGST Mismatch")
+            reasons.append("CGST mismatch")
 
         if round(row["SGSTPR"],2)!=round(row["SGST2B"],2):
-            reasons.append("SGST Mismatch")
+            reasons.append("SGST mismatch")
 
         if len(reasons)==0:
             return pd.Series(["Matched",""])
@@ -180,6 +172,7 @@ if gstr2b_file and purchase_file:
     recon=recon.drop(columns=["_merge"])
 
 
+    # ---------- DISPLAY ----------
     st.subheader("Summary")
     st.write(recon["Status"].value_counts())
 
@@ -187,9 +180,8 @@ if gstr2b_file and purchase_file:
     st.dataframe(recon,use_container_width=True)
 
 
-    # Export
+    # ---------- EXPORT ----------
     file="GST_Reconciliation_Output.xlsx"
-
     recon.to_excel(file,index=False)
 
     with open(file,"rb") as f:
