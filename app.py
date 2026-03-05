@@ -9,10 +9,9 @@ gstr2b_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx","xls"])
 purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx","xls"])
 
 
-# ----------------------------
-# CLEAN COLUMN FUNCTION
-# ----------------------------
-
+# -------------------------
+# CLEAN COLUMN NAME
+# -------------------------
 def clean(text):
     text=str(text).lower()
     text=text.replace("₹","")
@@ -20,26 +19,24 @@ def clean(text):
     return text
 
 
-# ----------------------------
-# FIND COLUMN BY KEYWORDS
-# ----------------------------
-
-def find_col(columns,keys):
+# -------------------------
+# FIND COLUMN
+# -------------------------
+def find_col(columns,keywords):
 
     for col in columns:
         c=clean(col)
 
-        for k in keys:
-            if k in c:
+        for key in keywords:
+            if key in c:
                 return col
 
     return None
 
 
-# ----------------------------
+# -------------------------
 # LOAD GSTR2B B2B SHEET
-# ----------------------------
-
+# -------------------------
 def load_gstr2b(file):
 
     excel=pd.ExcelFile(file)
@@ -53,13 +50,15 @@ def load_gstr2b(file):
     header_row=None
 
     for i in range(len(raw)):
-        if raw.iloc[i].astype(str).str.contains("gstin",case=False).any():
+
+        row=raw.iloc[i].astype(str).str.lower()
+
+        if any("gstin" in x for x in row):
             header_row=i
             break
 
     if header_row is None:
-        st.error("Could not detect header row in B2B sheet")
-        st.stop()
+        header_row=0
 
     df=excel.parse("B2B",header=header_row)
     df.columns=df.columns.str.strip()
@@ -67,10 +66,9 @@ def load_gstr2b(file):
     return df
 
 
-# ----------------------------
+# -------------------------
 # LOAD PURCHASE REGISTER
-# ----------------------------
-
+# -------------------------
 def load_purchase(file):
 
     raw=pd.read_excel(file,header=None)
@@ -78,15 +76,15 @@ def load_purchase(file):
     header_row=None
 
     for i in range(len(raw)):
+
         row=raw.iloc[i].astype(str).str.lower()
 
-        if any("gstin" in x for x in row) and any("invoice" in x for x in row):
+        if any("gstin" in x for x in row) or any("invoice" in x for x in row):
             header_row=i
             break
 
     if header_row is None:
-        st.error("Purchase Register header not detected")
-        st.stop()
+        header_row=0
 
     df=pd.read_excel(file,header=header_row)
     df.columns=df.columns.str.strip()
@@ -94,24 +92,22 @@ def load_purchase(file):
     return df
 
 
-# ----------------------------
+# -------------------------
 # MAIN PROCESS
-# ----------------------------
-
+# -------------------------
 if gstr2b_file and purchase_file:
 
     gstr2b=load_gstr2b(gstr2b_file)
     purchase=load_purchase(purchase_file)
 
-    # Detect Columns
 
+    # Detect columns
     gstin2b=find_col(gstr2b.columns,["gstin"])
     inv2b=find_col(gstr2b.columns,["invoice"])
     tax2b=find_col(gstr2b.columns,["taxable"])
-    igst2b=find_col(gstr2b.columns,["integrated","igst"])
-    cgst2b=find_col(gstr2b.columns,["central","cgst"])
-    sgst2b=find_col(gstr2b.columns,["state","sgst"])
-
+    igst2b=find_col(gstr2b.columns,["igst","integrated"])
+    cgst2b=find_col(gstr2b.columns,["cgst","central"])
+    sgst2b=find_col(gstr2b.columns,["sgst","state"])
 
     gstinpr=find_col(purchase.columns,["gstin"])
     invpr=find_col(purchase.columns,["supplierinvoice","invoice"])
@@ -121,8 +117,7 @@ if gstr2b_file and purchase_file:
     sgstpr=find_col(purchase.columns,["sgst"])
 
 
-    # Build Standard Tables
-
+    # Standard tables
     df2b=pd.DataFrame({
 
         "GSTIN":gstr2b[gstin2b].astype(str).str.strip().str.upper(),
@@ -148,12 +143,10 @@ if gstr2b_file and purchase_file:
 
 
     # Merge
-
     recon=pd.merge(dfpr,df2b,on=["GSTIN","Invoice"],how="outer",indicator=True)
 
 
-    # Status + Reason
-
+    # Status logic
     def status(row):
 
         if row["_merge"]=="left_only":
@@ -187,19 +180,14 @@ if gstr2b_file and purchase_file:
     recon=recon.drop(columns=["_merge"])
 
 
-    # Display
-
     st.subheader("Summary")
-
     st.write(recon["Status"].value_counts())
 
     st.subheader("Reconciliation Result")
-
     st.dataframe(recon,use_container_width=True)
 
 
-    # Export Excel
-
+    # Export
     file="GST_Reconciliation_Output.xlsx"
 
     recon.to_excel(file,index=False)
