@@ -5,137 +5,174 @@ import re
 st.set_page_config(page_title="GST Reconciliation", layout="wide")
 st.title("GST 2B vs Purchase Register Reconciliation")
 
-gstr2b_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx","xls"])
+
+gstr2b_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx","xls"])
 
 
-# ----------------------------
+# ---------------------------
+# CLEAN INVOICE NUMBER
+# ---------------------------
+
+def clean_invoice(inv):
+
+    if pd.isna(inv):
+        return ""
+
+    inv=str(inv)
+
+    parts=re.split(r'[/-]',inv)
+
+    for p in parts:
+
+        num=re.sub(r'\D','',p)
+
+        if len(num)>=3:
+            return num
+
+    return re.sub(r'\D','',inv)
+
+
+
+# ---------------------------
 # CLEAN COLUMN NAME
-# ----------------------------
+# ---------------------------
 
-def clean(text):
-    text=str(text).lower()
-    text=text.replace("₹","")
-    text=re.sub(r'[^a-z0-9]','',text)
-    return text
+def clean(col):
+
+    col=str(col).lower()
+    col=col.replace("₹","")
+    col=re.sub(r'[^a-z0-9]','',col)
+
+    return col
 
 
-# ----------------------------
+
+# ---------------------------
 # FIND COLUMN
-# ----------------------------
+# ---------------------------
 
-def find_column(columns, keywords):
+def find_column(cols,keys):
 
-    for col in columns:
-        c=clean(col)
+    for c in cols:
 
-        for key in keywords:
-            if key in c:
-                return col
+        cc=clean(c)
+
+        for k in keys:
+
+            if k in cc:
+                return c
 
     return None
 
 
-# ----------------------------
-# SAFE NUMBER
-# ----------------------------
 
-def safe_number(df,col):
+# ---------------------------
+# LOAD GSTR2B B2B
+# ---------------------------
 
-    if col and col in df.columns:
-        return pd.to_numeric(df[col],errors="coerce").fillna(0)
+def load_2b(file):
 
-    return 0
+    xl=pd.ExcelFile(file)
 
+    if "B2B" not in xl.sheet_names:
 
-# ----------------------------
-# LOAD GSTR-2B
-# ----------------------------
-
-def load_gstr2b(file):
-
-    excel=pd.ExcelFile(file)
-
-    if "B2B" not in excel.sheet_names:
         st.error("B2B sheet not found in GSTR-2B")
         st.stop()
 
-    raw=excel.parse("B2B",header=None)
+    raw=xl.parse("B2B",header=None)
 
-    header_row=0
+    header=0
 
     for i in range(len(raw)):
 
         if raw.iloc[i].astype(str).str.contains("gstin",case=False).any():
-            header_row=i
+
+            header=i
             break
 
-    df=excel.parse("B2B",header=header_row)
+    df=xl.parse("B2B",header=header)
+
     df.columns=df.columns.str.strip()
 
     return df
 
 
-# ----------------------------
-# LOAD PURCHASE REGISTER
-# ----------------------------
+
+# ---------------------------
+# LOAD PURCHASE
+# ---------------------------
 
 def load_purchase(file):
 
     raw=pd.read_excel(file,header=None)
 
-    header_row=0
+    header=0
 
     for i in range(len(raw)):
 
         row=raw.iloc[i].astype(str).str.lower()
 
         if any("gstin" in x for x in row):
-            header_row=i
+
+            header=i
             break
 
-    df=pd.read_excel(file,header=header_row)
+    df=pd.read_excel(file,header=header)
+
     df.columns=df.columns.str.strip()
 
     return df
 
 
-# ----------------------------
-# MAIN PROCESS
-# ----------------------------
+
+# ---------------------------
+# MAIN
+# ---------------------------
 
 if gstr2b_file and purchase_file:
 
-    gstr2b=load_gstr2b(gstr2b_file)
+    gstr2b=load_2b(gstr2b_file)
+
     purchase=load_purchase(purchase_file)
 
-    # detect columns automatically
+
+    # detect columns
 
     gstin2b=find_column(gstr2b.columns,["gstin"])
-    invoice2b=find_column(gstr2b.columns,["invoice"])
-    taxable2b=find_column(gstr2b.columns,["taxable"])
-    igst2b=find_column(gstr2b.columns,["igst","integrated"])
-    cgst2b=find_column(gstr2b.columns,["cgst","central"])
-    sgst2b=find_column(gstr2b.columns,["sgst","state"])
+    name2b=find_column(gstr2b.columns,["tradename","legalname","tradelegalname"])
+    inv2b=find_column(gstr2b.columns,["invoice"])
+    date2b=find_column(gstr2b.columns,["date"])
+    igst2b=find_column(gstr2b.columns,["integrated"])
+    cgst2b=find_column(gstr2b.columns,["central"])
+    sgst2b=find_column(gstr2b.columns,["state"])
+
 
     gstinpr=find_column(purchase.columns,["gstin"])
-    invoicepr=find_column(purchase.columns,["invoice"])
-    taxablepr=find_column(purchase.columns,["taxable","value"])
+    namepr=find_column(purchase.columns,["particular"])
+    invpr=find_column(purchase.columns,["invoice"])
+    datepr=find_column(purchase.columns,["date"])
     igstpr=find_column(purchase.columns,["igst"])
     cgstpr=find_column(purchase.columns,["cgst"])
     sgstpr=find_column(purchase.columns,["sgst"])
 
 
-    # create standard tables
 
     df2b=pd.DataFrame({
 
         "GSTIN":gstr2b[gstin2b].astype(str).str.strip().str.upper(),
-        "Invoice":gstr2b[invoice2b].astype(str).str.strip().str.upper(),
-        "Taxable2B":safe_number(gstr2b,taxable2b),
-        "IGST2B":safe_number(gstr2b,igst2b),
-        "CGST2B":safe_number(gstr2b,cgst2b),
-        "SGST2B":safe_number(gstr2b,sgst2b)
+
+        "Party":gstr2b[name2b],
+
+        "Invoice":gstr2b[inv2b].apply(clean_invoice),
+
+        "Date2B":pd.to_datetime(gstr2b[date2b],errors="coerce"),
+
+        "IGST2B":pd.to_numeric(gstr2b[igst2b],errors="coerce").fillna(0),
+
+        "CGST2B":pd.to_numeric(gstr2b[cgst2b],errors="coerce").fillna(0),
+
+        "SGST2B":pd.to_numeric(gstr2b[sgst2b],errors="coerce").fillna(0)
 
     })
 
@@ -143,42 +180,46 @@ if gstr2b_file and purchase_file:
     dfpr=pd.DataFrame({
 
         "GSTIN":purchase[gstinpr].astype(str).str.strip().str.upper(),
-        "Invoice":purchase[invoicepr].astype(str).str.strip().str.upper(),
-        "TaxablePR":safe_number(purchase,taxablepr),
-        "IGSTPR":safe_number(purchase,igstpr),
-        "CGSTPR":safe_number(purchase,cgstpr),
-        "SGSTPR":safe_number(purchase,sgstpr)
+
+        "Party":purchase[namepr],
+
+        "Invoice":purchase[invpr].apply(clean_invoice),
+
+        "DatePR":pd.to_datetime(purchase[datepr],errors="coerce"),
+
+        "IGSTPR":pd.to_numeric(purchase[igstpr],errors="coerce").fillna(0),
+
+        "CGSTPR":pd.to_numeric(purchase[cgstpr],errors="coerce").fillna(0),
+
+        "SGSTPR":pd.to_numeric(purchase[sgstpr],errors="coerce").fillna(0)
 
     })
 
 
-    # merge
 
     recon=pd.merge(dfpr,df2b,on=["GSTIN","Invoice"],how="outer",indicator=True)
 
 
-    # status logic
 
-    def check(row):
+    def status(r):
 
-        if row["_merge"]=="left_only":
+        if r["_merge"]=="left_only":
+
             return pd.Series(["Mismatch","Missing in 2B"])
 
-        if row["_merge"]=="right_only":
+        if r["_merge"]=="right_only":
+
             return pd.Series(["Mismatch","Missing in Purchase"])
 
         reasons=[]
 
-        if round(row["TaxablePR"],2)!=round(row["Taxable2B"],2):
-            reasons.append("Taxable mismatch")
-
-        if round(row["IGSTPR"],2)!=round(row["IGST2B"],2):
+        if round(r["IGSTPR"],2)!=round(r["IGST2B"],2):
             reasons.append("IGST mismatch")
 
-        if round(row["CGSTPR"],2)!=round(row["CGST2B"],2):
+        if round(r["CGSTPR"],2)!=round(r["CGST2B"],2):
             reasons.append("CGST mismatch")
 
-        if round(row["SGSTPR"],2)!=round(row["SGST2B"],2):
+        if round(r["SGSTPR"],2)!=round(r["SGST2B"],2):
             reasons.append("SGST mismatch")
 
         if len(reasons)==0:
@@ -187,9 +228,11 @@ if gstr2b_file and purchase_file:
         return pd.Series(["Mismatch",",".join(reasons)])
 
 
-    recon[["Status","Reason"]]=recon.apply(check,axis=1)
+
+    recon[["Status","Reason"]]=recon.apply(status,axis=1)
 
     recon=recon.drop(columns=["_merge"])
+
 
 
     st.subheader("Summary")
@@ -202,16 +245,16 @@ if gstr2b_file and purchase_file:
     st.dataframe(recon,use_container_width=True)
 
 
-    # export
 
     file="GST_Reconciliation_Output.xlsx"
 
     recon.to_excel(file,index=False)
 
+
     with open(file,"rb") as f:
 
         st.download_button(
-            "Download Excel",
+            "Download Excel Report",
             data=f,
             file_name=file,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
