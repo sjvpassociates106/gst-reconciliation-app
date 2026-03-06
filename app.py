@@ -3,8 +3,8 @@ import pandas as pd
 import re
 
 st.set_page_config(page_title="GST Reconciliation", layout="wide")
-st.title("GST 2B vs Purchase Register Reconciliation")
 
+st.title("GST 2B vs Purchase Register Reconciliation")
 
 gstr2b_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx","xls"])
@@ -52,7 +52,7 @@ def safe_get(df,col):
 
 
 # -----------------------------
-# CLEAN INVOICE
+# CLEAN INVOICE NUMBER
 # -----------------------------
 def clean_invoice(inv):
 
@@ -73,15 +73,17 @@ def clean_invoice(inv):
     return re.sub(r'\D','',inv)
 
 
+
 # -----------------------------
-# LOAD GSTR-2B
+# LOAD GSTR2B
 # -----------------------------
 def load_2b(file):
 
     xl=pd.ExcelFile(file)
 
     if "B2B" not in xl.sheet_names:
-        st.error("B2B sheet not found in GSTR-2B")
+
+        st.error("B2B sheet not found in GSTR2B")
         st.stop()
 
     raw=xl.parse("B2B",header=None)
@@ -91,6 +93,7 @@ def load_2b(file):
     for i in range(len(raw)):
 
         if raw.iloc[i].astype(str).str.contains("gstin",case=False).any():
+
             header=i
             break
 
@@ -99,6 +102,7 @@ def load_2b(file):
     df.columns=df.columns.str.strip()
 
     return df
+
 
 
 # -----------------------------
@@ -115,6 +119,7 @@ def load_purchase(file):
         row=raw.iloc[i].astype(str).str.lower()
 
         if any("gstin" in x for x in row):
+
             header=i
             break
 
@@ -123,6 +128,7 @@ def load_purchase(file):
     df.columns=df.columns.str.strip()
 
     return df
+
 
 
 # -----------------------------
@@ -135,7 +141,7 @@ if gstr2b_file and purchase_file:
     purchase=load_purchase(purchase_file)
 
 
-    # -------- Detect columns --------
+    # -------- GSTR2B columns --------
 
     gstin2b=find_column(gstr2b.columns,["gstin"])
     name2b=find_column(gstr2b.columns,["tradename","legalname"])
@@ -147,7 +153,9 @@ if gstr2b_file and purchase_file:
     sgst2b=find_column(gstr2b.columns,["statetax","uttax"])
 
 
-    gstinpr=find_column(purchase.columns,["gstin"])
+    # -------- Purchase columns --------
+
+    gstinpr=find_column(purchase.columns,["gstinuin","gstin"])
     namepr=find_column(purchase.columns,["particular"])
     invpr=find_column(purchase.columns,["invoice"])
     datepr=find_column(purchase.columns,["date"])
@@ -157,42 +165,42 @@ if gstr2b_file and purchase_file:
     sgstpr=find_column(purchase.columns,["sgst"])
 
 
-    # -------- Create Standard Tables --------
+    # -------- Standard Tables --------
 
     df2b=pd.DataFrame({
 
-        "GSTIN":gstr2b[gstin2b].astype(str).str.strip().str.upper(),
+        "GSTIN": gstr2b[gstin2b].astype(str).str.strip().str.upper() if gstin2b else "",
 
-        "Party":gstr2b[name2b],
+        "Party_2B": gstr2b[name2b] if name2b else "",
 
-        "Invoice":gstr2b[inv2b].apply(clean_invoice),
+        "Invoice": gstr2b[inv2b].apply(clean_invoice) if inv2b else "",
 
-        "Date2B":pd.to_datetime(gstr2b[date2b],errors="coerce"),
+        "Date_2B": pd.to_datetime(gstr2b[date2b],errors="coerce") if date2b else "",
 
-        "IGST2B":safe_get(gstr2b,igst2b),
+        "IGST_2B": safe_get(gstr2b,igst2b),
 
-        "CGST2B":safe_get(gstr2b,cgst2b),
+        "CGST_2B": safe_get(gstr2b,cgst2b),
 
-        "SGST2B":safe_get(gstr2b,sgst2b)
+        "SGST_2B": safe_get(gstr2b,sgst2b)
 
     })
 
 
     dfpr=pd.DataFrame({
 
-        "GSTIN":purchase[gstinpr].astype(str).str.strip().str.upper(),
+        "GSTIN": purchase[gstinpr].astype(str).str.strip().str.upper() if gstinpr else "",
 
-        "Party":purchase[namepr],
+        "Party_PR": purchase[namepr] if namepr else "",
 
-        "Invoice":purchase[invpr].apply(clean_invoice),
+        "Invoice": purchase[invpr].apply(clean_invoice) if invpr else "",
 
-        "DatePR":pd.to_datetime(purchase[datepr],errors="coerce"),
+        "Date_PR": pd.to_datetime(purchase[datepr],errors="coerce") if datepr else "",
 
-        "IGSTPR":safe_get(purchase,igstpr),
+        "IGST_PR": safe_get(purchase,igstpr),
 
-        "CGSTPR":safe_get(purchase,cgstpr),
+        "CGST_PR": safe_get(purchase,cgstpr),
 
-        "SGSTPR":safe_get(purchase,sgstpr)
+        "SGST_PR": safe_get(purchase,sgstpr)
 
     })
 
@@ -204,23 +212,23 @@ if gstr2b_file and purchase_file:
 
     # -------- Status Logic --------
 
-    def check(r):
+    def check(row):
 
-        if r["_merge"]=="left_only":
+        if row["_merge"]=="left_only":
             return pd.Series(["Mismatch","Missing in 2B"])
 
-        if r["_merge"]=="right_only":
-            return pd.Series(["Mismatch","Missing in Purchase"])
+        if row["_merge"]=="right_only":
+            return pd.Series(["Mismatch","Missing in Purchase Register"])
 
         reasons=[]
 
-        if round(r["IGSTPR"],2)!=round(r["IGST2B"],2):
+        if round(row["IGST_PR"],2)!=round(row["IGST_2B"],2):
             reasons.append("IGST mismatch")
 
-        if round(r["CGSTPR"],2)!=round(r["CGST2B"],2):
+        if round(row["CGST_PR"],2)!=round(row["CGST_2B"],2):
             reasons.append("CGST mismatch")
 
-        if round(r["SGSTPR"],2)!=round(r["SGST2B"],2):
+        if round(row["SGST_PR"],2)!=round(row["SGST_2B"],2):
             reasons.append("SGST mismatch")
 
         if len(reasons)==0:
@@ -234,27 +242,23 @@ if gstr2b_file and purchase_file:
     recon=recon.drop(columns=["_merge"])
 
 
-    st.subheader("Summary")
-
-    st.write(recon["Status"].value_counts())
-
-
     st.subheader("Reconciliation Result")
 
     st.dataframe(recon,use_container_width=True)
 
 
-    # -------- Export --------
+    # -------- Export Excel --------
 
-    file="GST_Reconciliation_Output.xlsx"
+    output_file="GST_Reconciliation_Result.xlsx"
 
-    recon.to_excel(file,index=False)
+    recon.to_excel(output_file,index=False)
 
-    with open(file,"rb") as f:
+
+    with open(output_file,"rb") as f:
 
         st.download_button(
-            "Download Excel Report",
+            "Download Excel Result",
             data=f,
-            file_name=file,
+            file_name=output_file,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
