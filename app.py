@@ -2,6 +2,32 @@ import streamlit as st
 import pandas as pd
 import re
 
+# ---- Invoice cleaning function ----
+
+def clean_invoice(inv):
+
+    if inv is None:
+        return ""
+
+    inv = str(inv)
+
+    parts = re.split(r'[/-]', inv)
+
+    numbers = []
+
+    for p in parts:
+        n = re.sub(r'\D','',p)
+        if n:
+            numbers.append(n)
+
+    if len(numbers) >= 2:
+        return numbers[0] + numbers[1]
+
+    if len(numbers) == 1:
+        return numbers[0]
+
+    return ""
+
 st.set_page_config(page_title="GST Reconciliation", layout="wide")
 st.title("GST 2B vs Purchase Register Reconciliation")
 
