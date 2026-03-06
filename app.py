@@ -3,6 +3,7 @@ import pandas as pd
 import re
 
 st.set_page_config(page_title="GST Reconciliation Tool", layout="wide")
+
 st.title("GST 2B vs Purchase Register Reconciliation")
 
 gstr_file = st.file_uploader("Upload GSTR-2B Excel", type=["xlsx"])
@@ -12,6 +13,7 @@ purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"]
 # -------------------------
 # Clean Invoice Function
 # -------------------------
+
 def clean_invoice(inv):
 
     if pd.isna(inv):
@@ -24,7 +26,9 @@ def clean_invoice(inv):
     nums = []
 
     for p in parts:
+
         n = re.sub(r"\D","",p)
+
         if n:
             nums.append(n)
 
@@ -38,36 +42,9 @@ def clean_invoice(inv):
 
 
 # -------------------------
-# Clean Column Name
+# Safe Number
 # -------------------------
-def clean_col(text):
 
-    text = str(text).lower()
-    text = text.replace("₹","")
-    text = re.sub(r"[^a-z0-9]","",text)
-
-    return text
-
-
-# -------------------------
-# Find Column Automatically
-# -------------------------
-def find_column(columns, keywords):
-
-    for col in columns:
-
-        c = clean_col(col)
-
-        for key in keywords:
-            if key in c:
-                return col
-
-    return None
-
-
-# -------------------------
-# Safe Numeric
-# -------------------------
 def safe_num(df, col):
 
     if col is None:
@@ -77,108 +54,108 @@ def safe_num(df, col):
 
 
 # -------------------------
-# Load 2B
+# Column Finder
 # -------------------------
-def load_2b(file):
 
-    xl = pd.ExcelFile(file)
+def find_col(columns, keyword):
+
+    for col in columns:
+
+        if keyword in str(col).lower():
+            return col
+
+    return None
+
+
+# =========================
+# PROCESS
+# =========================
+
+if gstr_file and purchase_file:
+
+    # -------- Load GSTR2B --------
+
+    xl = pd.ExcelFile(gstr_file)
 
     if "B2B" not in xl.sheet_names:
         st.error("B2B sheet not found in GSTR-2B")
         st.stop()
 
-    df = xl.parse("B2B")
+    gstr2b = xl.parse("B2B")
 
-    df.columns = df.columns.str.strip()
-
-    return df
+    gstr2b.columns = gstr2b.columns.str.strip()
 
 
-# -------------------------
-# Load Purchase Register
-# -------------------------
-def load_purchase(file):
+    # Detect GSTR2B columns
 
-    raw = pd.read_excel(file, header=None)
+    gstin2b = find_col(gstr2b.columns,"gstin")
+    party2b = find_col(gstr2b.columns,"trade")
+    inv2b = find_col(gstr2b.columns,"invoice")
 
-    header = 0
-
-    for i in range(len(raw)):
-        row = raw.iloc[i].astype(str).str.lower()
-
-        if any("gstin" in x for x in row):
-            header = i
-            break
-
-    df = pd.read_excel(file, header=header)
-
-    df.columns = df.columns.str.strip()
-
-    return df
+    igst2b = find_col(gstr2b.columns,"integrated")
+    cgst2b = find_col(gstr2b.columns,"central")
+    sgst2b = find_col(gstr2b.columns,"state")
 
 
-# -------------------------
-# MAIN PROCESS
-# -------------------------
-if gstr_file and purchase_file:
-
-    gstr2b = load_2b(gstr_file)
-    purchase = load_purchase(purchase_file)
+    if gstin2b is None or inv2b is None:
+        st.error("Required columns not found in GSTR-2B")
+        st.write(gstr2b.columns)
+        st.stop()
 
 
-    # Detect columns in GSTR-2B
+    # -------- Load Purchase Register --------
 
-    gstin2b = find_column(gstr2b.columns, ["gstin"])
-    inv2b = find_column(gstr2b.columns, ["invoice"])
-    igst2b = find_column(gstr2b.columns, ["integratedtax"])
-    cgst2b = find_column(gstr2b.columns, ["centraltax"])
-    sgst2b = find_column(gstr2b.columns, ["statetax","uttax"])
+    purchase = pd.read_excel(purchase_file)
+
+    purchase.columns = purchase.columns.str.strip()
 
 
-    # Detect columns in Purchase Register
+    gstinpr = find_col(purchase.columns,"gstin")
+    invpr = find_col(purchase.columns,"invoice")
+    party_namepr = find_col(purchase.columns,"particular")
 
-    gstinpr = find_column(purchase.columns, ["gstinuin","gstin"])
-    invpr = find_column(purchase.columns, ["invoice"])
-    igstpr = find_column(purchase.columns, ["igst"])
-    cgstpr = find_column(purchase.columns, ["cgst"])
-    sgstpr = find_column(purchase.columns, ["sgst"])
-
-
-    # -------------------------
-    # Create Clean DataFrames
-    # -------------------------
+    igstpr = find_col(purchase.columns,"igst")
+    cgstpr = find_col(purchase.columns,"cgst")
+    sgstpr = find_col(purchase.columns,"sgst")
 
 
-df2b = pd.DataFrame()
+    # -------- Clean GSTR2B --------
 
-df2b["GSTIN of Supplier"] = gstr2b[gstin2b].astype(str).str.upper().str.strip()
-df2b["Invoice Number"] = gstr2b[inv2b].apply(clean_invoice)
-df2b["Trade/Legal name"] = gstr2b[trade_name2b].astype(str).str.strip()
+    df2b = pd.DataFrame()
 
-df2b["Integrated Tax"] = safe_num(gstr2b, igst2b)
-df2b["Central Tax"] = safe_num(gstr2b, cgst2b)
-df2b["State/UT Tax"] = safe_num(gstr2b, sgst2b)
+    df2b["GSTIN"] = gstr2b[gstin2b].astype(str).str.upper().str.strip()
 
+    df2b["Invoice"] = gstr2b[inv2b].apply(clean_invoice)
 
-dfpr = pd.DataFrame()
+    df2b["Party"] = gstr2b[party2b].astype(str).str.upper().str.strip()
 
-dfpr["GSTIN"] = purchase[gstinpr].astype(str).str.upper().str.strip()
-dfpr["Supplier Invoice No."] = purchase[invpr].apply(clean_invoice)
-dfpr["Particular"] = purchase[party_namepr].apply(clean_invoice)
-
-dfpr["IGSTPR"] = safe_num(purchase, igstpr)
-dfpr["CGSTPR"] = safe_num(purchase, cgstpr)
-dfpr["SGSTPR"] = safe_num(purchase, sgstpr)
-
-# Remove empty rows
-
-df2b = df2b.dropna(subset=["GSTIN", "Invoice Number"])
-dfpr = dfpr.dropna(subset=["GSTIN", "Supplier Invoice No."])
+    df2b["IGST2B"] = safe_num(gstr2b, igst2b)
+    df2b["CGST2B"] = safe_num(gstr2b, cgst2b)
+    df2b["SGST2B"] = safe_num(gstr2b, sgst2b)
 
 
-    # -------------------------
-    # Merge
-    # -------------------------
+    # -------- Clean Purchase Register --------
+
+    dfpr = pd.DataFrame()
+
+    dfpr["GSTIN"] = purchase[gstinpr].astype(str).str.upper().str.strip()
+
+    dfpr["Invoice"] = purchase[invpr].apply(clean_invoice)
+
+    dfpr["Party"] = purchase[party_namepr].astype(str).str.upper().str.strip()
+
+    dfpr["IGSTPR"] = safe_num(purchase, igstpr)
+    dfpr["CGSTPR"] = safe_num(purchase, cgstpr)
+    dfpr["SGSTPR"] = safe_num(purchase, sgstpr)
+
+
+    # -------- Remove empty rows --------
+
+    df2b = df2b.dropna(subset=["GSTIN","Invoice"])
+    dfpr = dfpr.dropna(subset=["GSTIN","Invoice"])
+
+
+    # -------- Merge --------
 
     recon = pd.merge(
         dfpr,
@@ -189,9 +166,7 @@ dfpr = dfpr.dropna(subset=["GSTIN", "Supplier Invoice No."])
     )
 
 
-    # -------------------------
-    # Reconciliation Logic
-    # -------------------------
+    # -------- Reconciliation Logic --------
 
     def check(row):
 
@@ -223,14 +198,14 @@ dfpr = dfpr.dropna(subset=["GSTIN", "Supplier Invoice No."])
     recon = recon.drop(columns=["_merge"])
 
 
+    # -------- Display --------
+
     st.subheader("Reconciliation Result")
 
     st.dataframe(recon, use_container_width=True)
 
 
-    # -------------------------
-    # Export Excel
-    # -------------------------
+    # -------- Export Excel --------
 
     output_file = "GST_Reconciliation_Output.xlsx"
 
