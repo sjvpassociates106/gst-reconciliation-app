@@ -181,9 +181,13 @@ if gstr2b_file and purchase_file:
 
     # Remove blanks
 
-    df2b = df2b.dropna(subset=["GSTIN","Invoice"])
-    dfpr = dfpr.dropna(subset=["GSTIN","Invoice"])
+    if "GSTIN" not in df2b.columns or "Invoice" not in df2b.columns:
+    st.error("GSTR-2B required columns not detected. Check B2B sheet headers.")
+    st.stop()
 
+if "GSTIN" not in dfpr.columns or "Invoice" not in dfpr.columns:
+    st.error("Purchase Register required columns not detected.")
+    st.stop()
 
     # Merge
 
