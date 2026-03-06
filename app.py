@@ -167,24 +167,22 @@ if gstr2b_file and purchase_file:
 
     # -------- Standard Tables --------
 
-    df2b=pd.DataFrame({
+    
+       df2b = pd.DataFrame()
 
-        "GSTIN": gstr2b[gstin2b].astype(str).str.strip().str.upper() if gstin2b else "",
+df2b["GSTIN"] = gstr2b[gstin2b].astype(str).str.strip().str.upper() if gstin2b else pd.Series()
 
-        "Party_2B": gstr2b[name2b] if name2b else "",
+df2b["Party_2B"] = gstr2b[name2b] if name2b else pd.Series()
 
-        "Invoice": gstr2b[inv2b].apply(clean_invoice) if inv2b else "",
+df2b["Invoice"] = gstr2b[inv2b].apply(clean_invoice) if inv2b else pd.Series()
 
-        "Date_2B": pd.to_datetime(gstr2b[date2b],errors="coerce") if date2b else "",
+df2b["Date_2B"] = pd.to_datetime(gstr2b[date2b],errors="coerce") if date2b else pd.Series()
 
-        "IGST_2B": safe_get(gstr2b,igst2b),
+df2b["IGST_2B"] = safe_get(gstr2b,igst2b)
 
-        "CGST_2B": safe_get(gstr2b,cgst2b),
+df2b["CGST_2B"] = safe_get(gstr2b,cgst2b)
 
-        "SGST_2B": safe_get(gstr2b,sgst2b)
-
-    })
-
+df2b["SGST_2B"] = safe_get(gstr2b,sgst2b)
 
     dfpr = pd.DataFrame()
 
