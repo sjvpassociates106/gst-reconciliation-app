@@ -73,50 +73,26 @@ def find_col(columns, keyword):
 
 if gstr_file and purchase_file:
 
-    # -------- Load GSTR2B --------
+    xl = pd.ExcelFile(gstr_file)
 
-  # -------- Load GSTR2B properly --------
+    raw = xl.parse("B2B", header=None)
 
-xl = pd.ExcelFile(gstr_file)
+    header_row = None
 
-raw = xl.parse("B2B", header=None)
+    for i in range(len(raw)):
+        row = raw.iloc[i].astype(str).str.lower()
 
-header_row = None
+        if "gstin of supplier" in row.values:
+            header_row = i
+            break
 
-for i in range(len(raw)):
-    row = raw.iloc[i].astype(str).str.lower()
-
-    if "gstin of supplier" in row.values:
-        header_row = i
-        break
-
-
-if header_row is None:
-    st.error("Could not detect header row in B2B sheet")
-    st.stop()
-
-
-gstr2b = xl.parse("B2B", header=header_row)
-
-gstr2b.columns = gstr2b.columns.str.strip()
-
-
-    # Detect GSTR2B columns
-
-    gstin2b = find_col(gstr2b.columns,"gstin")
-    party2b = find_col(gstr2b.columns,"trade of supplier")
-    inv2b = find_col(gstr2b.columns,"invoice Number")
-
-    igst2b = find_col(gstr2b.columns,"integrated tax")
-    cgst2b = find_col(gstr2b.columns,"central tax")
-    sgst2b = find_col(gstr2b.columns,"state tax")
-
-
-    if gstin2b is None or inv2b is None:
-        st.error("Required columns not found in GSTR-2B")
-        st.write(gstr2b.columns)
+    if header_row is None:
+        st.error("Could not detect header row in B2B sheet")
         st.stop()
 
+    gstr2b = xl.parse("B2B", header=header_row)
+
+    gstr2b.columns = gstr2b.columns.str.strip()
 
     # -------- Load Purchase Register --------
 
