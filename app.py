@@ -6,29 +6,16 @@ st.set_page_config(page_title="GST Reconciliation", layout="wide")
 st.title("GST 2B vs Purchase Register Reconciliation")
 
 gstr2b_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
-purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx","xls"])
-# Check GSTR2B required columns
+purchase_file = st.file_uploader("Upload Purchase Register File", type=["xls","xlsx"])
 
-if "GSTIN" not in df2b.columns or "Invoice" not in df2b.columns:
-    st.error("GSTR-2B required columns not detected. Check B2B sheet headers.")
-    st.stop()
-
-
-# Check Purchase Register required columns
-
-if "GSTIN" not in dfpr.columns or "Invoice" not in dfpr.columns:
-    st.error("Purchase Register required columns not detected.")
-    st.stop()
 
 # -----------------------------
 # Clean column name
 # -----------------------------
 def clean(text):
-
     text = str(text).lower()
     text = text.replace("₹","")
     text = re.sub(r'[^a-z0-9]','',text)
-
     return text
 
 
@@ -38,11 +25,9 @@ def clean(text):
 def find_column(columns, keywords):
 
     for col in columns:
-
         c = clean(col)
 
         for k in keywords:
-
             if k in c:
                 return col
 
@@ -61,7 +46,7 @@ def safe_num(df, col):
 
 
 # -----------------------------
-# Clean invoice
+# Clean invoice number
 # -----------------------------
 def clean_invoice(inv):
 
@@ -75,7 +60,6 @@ def clean_invoice(inv):
     nums = []
 
     for p in parts:
-
         n = re.sub(r'\D','',p)
 
         if n:
@@ -91,18 +75,17 @@ def clean_invoice(inv):
 
 
 # -----------------------------
-# Load GSTR2B
+# Load GSTR-2B B2B
 # -----------------------------
 def load_2b(file):
 
     xl = pd.ExcelFile(file)
 
     if "B2B" not in xl.sheet_names:
-        st.error("B2B sheet not found")
+        st.error("B2B sheet not found in GSTR-2B file")
         st.stop()
 
     df = xl.parse("B2B")
-
     df.columns = df.columns.str.strip()
 
     return df
@@ -118,16 +101,13 @@ def load_purchase(file):
     header = 0
 
     for i in range(len(raw)):
-
         row = raw.iloc[i].astype(str).str.lower()
 
         if any("gstin" in x for x in row):
-
             header = i
             break
 
     df = pd.read_excel(file, header=header)
-
     df.columns = df.columns.str.strip()
 
     return df
@@ -142,25 +122,27 @@ if gstr2b_file and purchase_file:
     purchase = load_purchase(purchase_file)
 
 
-    # Detect GSTR2B columns
+    # Detect columns in 2B
 
     gstin2b = find_column(gstr2b.columns, ["gstin"])
-    inv2b = find_column(gstr2b.columns, ["invoice"])
-    igst2b = find_column(gstr2b.columns, ["integratedtax"])
-    cgst2b = find_column(gstr2b.columns, ["centraltax"])
-    sgst2b = find_column(gstr2b.columns, ["statetax","uttax"])
+    inv2b   = find_column(gstr2b.columns, ["invoice"])
+
+    igst2b  = find_column(gstr2b.columns, ["integratedtax"])
+    cgst2b  = find_column(gstr2b.columns, ["centraltax"])
+    sgst2b  = find_column(gstr2b.columns, ["statetax","uttax"])
 
 
-    # Detect Purchase columns
+    # Detect columns in Purchase
 
     gstinpr = find_column(purchase.columns, ["gstinuin","gstin"])
-    invpr = find_column(purchase.columns, ["invoice"])
-    igstpr = find_column(purchase.columns, ["igst"])
-    cgstpr = find_column(purchase.columns, ["cgst"])
-    sgstpr = find_column(purchase.columns, ["sgst"])
+    invpr   = find_column(purchase.columns, ["invoice"])
+
+    igstpr  = find_column(purchase.columns, ["igst"])
+    cgstpr  = find_column(purchase.columns, ["cgst"])
+    sgstpr  = find_column(purchase.columns, ["sgst"])
 
 
-    # Build GSTR2B table
+    # Create GSTR-2B table
 
     df2b = pd.DataFrame()
 
@@ -175,7 +157,7 @@ if gstr2b_file and purchase_file:
     df2b["SGST2B"] = safe_num(gstr2b, sgst2b)
 
 
-    # Build Purchase table
+    # Create Purchase table
 
     dfpr = pd.DataFrame()
 
@@ -190,15 +172,14 @@ if gstr2b_file and purchase_file:
     dfpr["SGSTPR"] = safe_num(purchase, sgstpr)
 
 
-    # Remove blanks
+    # Only drop rows if columns exist
 
-    if "GSTIN" not in df2b.columns or "Invoice" not in df2b.columns:
-    st.error("GSTR-2B required columns not detected. Check B2B sheet headers.")
-    st.stop()
+    if "GSTIN" in df2b.columns and "Invoice" in df2b.columns:
+        df2b = df2b.dropna(subset=["GSTIN","Invoice"])
 
-if "GSTIN" not in dfpr.columns or "Invoice" not in dfpr.columns:
-    st.error("Purchase Register required columns not detected.")
-    st.stop()
+    if "GSTIN" in dfpr.columns and "Invoice" in dfpr.columns:
+        dfpr = dfpr.dropna(subset=["GSTIN","Invoice"])
+
 
     # Merge
 
@@ -213,7 +194,7 @@ if "GSTIN" not in dfpr.columns or "Invoice" not in dfpr.columns:
 
     # Status logic
 
-    def status(row):
+    def check(row):
 
         if row["_merge"] == "left_only":
             return pd.Series(["Mismatch","Missing in 2B"])
@@ -238,12 +219,14 @@ if "GSTIN" not in dfpr.columns or "Invoice" not in dfpr.columns:
         return pd.Series(["Mismatch",",".join(reasons)])
 
 
-    recon[["Status","Reason"]] = recon.apply(status, axis=1)
+    recon[["Status","Reason"]] = recon.apply(check, axis=1)
 
     recon = recon.drop(columns=["_merge"])
 
 
-    st.dataframe(recon)
+    st.subheader("Reconciliation Result")
+
+    st.dataframe(recon, use_container_width=True)
 
 
     # Export Excel
