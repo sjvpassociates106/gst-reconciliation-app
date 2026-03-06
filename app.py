@@ -122,20 +122,20 @@ if gstr_file and purchase_file:
 
     df2b = pd.DataFrame()
 
-    df2b["GSTIN"] = gstr2b[gstin2b].astype(str).str.upper().str.strip()
-    df2b["Invoice"] = gstr2b[inv2b].apply(clean_invoice)
-    df2b["Party"] = gstr2b[party2b].astype(str).str.strip()
+    df2b["GSTIN of Suppliers"] = gstr2b[gstin2b].astype(str).str.upper().str.strip()
+    df2b["Invoice number"] = gstr2b[inv2b].apply(clean_invoice)
+    df2b["trade name"] = gstr2b[party2b].astype(str).str.strip()
 
-    df2b["IGST2B"] = safe_num(gstr2b, igst2b)
-    df2b["CGST2B"] = safe_num(gstr2b, cgst2b)
-    df2b["SGST2B"] = safe_num(gstr2b, sgst2b)
+    df2b["Integrate Tax"] = safe_num(gstr2b, igst2b)
+    df2b["Central tax"] = safe_num(gstr2b, cgst2b)
+    df2b["State tax"] = safe_num(gstr2b, sgst2b)
 
 
     dfpr = pd.DataFrame()
 
     dfpr["GSTIN"] = purchase[gstinpr].astype(str).str.upper().str.strip()
-    dfpr["Invoice"] = purchase[invpr].apply(clean_invoice)
-    dfpr["Party"] = purchase[partypr].astype(str).str.strip()
+    dfpr["Supplier Invoice Number"] = purchase[invpr].apply(clean_invoice)
+    dfpr["Particular"] = purchase[partypr].astype(str).str.strip()
 
     dfpr["IGSTPR"] = safe_num(purchase, igstpr)
     dfpr["CGSTPR"] = safe_num(purchase, cgstpr)
