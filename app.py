@@ -3,29 +3,24 @@ import pandas as pd
 import re
 
 st.set_page_config(page_title="GST Reconciliation", layout="wide")
-
 st.title("GST 2B vs Purchase Register Reconciliation")
-
 
 gstr2b_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx","xls"])
 
 
 # -----------------------------
-# CLEAN COLUMN NAME
+# Clean column names
 # -----------------------------
 def clean(col):
-
     col = str(col).lower()
     col = col.replace("₹","")
-
     col = re.sub(r'[^a-z0-9]','',col)
-
     return col
 
 
 # -----------------------------
-# FIND COLUMN
+# Find column
 # -----------------------------
 def find_column(columns, keys):
 
@@ -42,7 +37,7 @@ def find_column(columns, keys):
 
 
 # -----------------------------
-# SAFE NUMBER COLUMN
+# Safe number column
 # -----------------------------
 def safe_get(df, col):
 
@@ -56,7 +51,7 @@ def safe_get(df, col):
 
 
 # -----------------------------
-# CLEAN INVOICE
+# Clean invoice number
 # -----------------------------
 def clean_invoice(inv):
 
@@ -65,12 +60,12 @@ def clean_invoice(inv):
 
     inv = str(inv)
 
-    # split invoice by symbols
     parts = re.split(r'[/-]', inv)
 
     numbers = []
 
     for p in parts:
+
         num = re.sub(r'\D','',p)
 
         if num:
@@ -83,12 +78,18 @@ def clean_invoice(inv):
         return numbers[0]
 
     return ""
+
+
 # -----------------------------
-# LOAD GSTR2B B2B SHEET
+# Load GSTR2B
 # -----------------------------
 def load_2b(file):
 
     xl = pd.ExcelFile(file)
+
+    if "B2B" not in xl.sheet_names:
+        st.error("B2B sheet not found in GSTR2B")
+        st.stop()
 
     df = xl.parse("B2B")
 
@@ -98,7 +99,7 @@ def load_2b(file):
 
 
 # -----------------------------
-# LOAD PURCHASE REGISTER
+# Load Purchase Register
 # -----------------------------
 def load_purchase(file):
 
@@ -122,171 +123,92 @@ def load_purchase(file):
 
 
 # -----------------------------
-# PROCESS
+# MAIN PROCESS
 # -----------------------------
 if gstr2b_file and purchase_file:
 
     gstr2b = load_2b(gstr2b_file)
-
     purchase = load_purchase(purchase_file)
 
 
-    # -------- detect columns --------
+    # Detect columns in GSTR2B
 
     gstin2b = find_column(gstr2b.columns, ["gstin"])
-
-    inv2b = find_column(gstr2b.columns, ["invoice"])
+    inv2b = find_column(gstr2b.columns, ["invoicenumber","invoice"])
 
     igst2b = find_column(gstr2b.columns, ["integratedtax"])
-
     cgst2b = find_column(gstr2b.columns, ["centraltax"])
-
     sgst2b = find_column(gstr2b.columns, ["statetax","uttax"])
 
 
-    gstinpr = find_column(purchase.columns, ["gstinuin","gstin"])
+    # Detect columns in Purchase Register
 
+    gstinpr = find_column(purchase.columns, ["gstinuin","gstin"])
     invpr = find_column(purchase.columns, ["invoice"])
 
     igstpr = find_column(purchase.columns, ["igst"])
-
     cgstpr = find_column(purchase.columns, ["cgst"])
-
     sgstpr = find_column(purchase.columns, ["sgst"])
 
 
-    # -------- build dataframe safely --------
+    # Create standardized tables
 
     df2b = pd.DataFrame()
 
-    df2b["GSTIN"] = gstr2b[gstin2b].astype(str).str.upper().str.strip() if gstin2b else pd.Series()
-
-    df2b["Invoice"] = gstr2b[inv2b].apply(clean_invoice) if inv2b else pd.Series()
+    df2b["GSTIN"] = gstr2b[gstin2b].astype(str).str.upper().str.strip()
+    df2b["Invoice"] = gstr2b[inv2b].apply(clean_invoice)
 
     df2b["IGST2B"] = safe_get(gstr2b, igst2b)
-
     df2b["CGST2B"] = safe_get(gstr2b, cgst2b)
-
     df2b["SGST2B"] = safe_get(gstr2b, sgst2b)
-
 
 
     dfpr = pd.DataFrame()
 
-    dfpr["GSTIN"] = purchase[gstinpr].astype(str).str.upper().str.strip() if gstinpr else pd.Series()
-
-    dfpr["Invoice"] = purchase[invpr].apply(clean_invoice) if invpr else pd.Series()
+    dfpr["GSTIN"] = purchase[gstinpr].astype(str).str.upper().str.strip()
+    dfpr["Invoice"] = purchase[invpr].apply(clean_invoice)
 
     dfpr["IGSTPR"] = safe_get(purchase, igstpr)
-
     dfpr["CGSTPR"] = safe_get(purchase, cgstpr)
-
     dfpr["SGSTPR"] = safe_get(purchase, sgstpr)
 
 
-    
+    # Remove blank rows
 
-# -------- merge purchase and 2B --------
-
-# -------- remove blank rows --------
-
-df2b = df2b.dropna(subset=["GSTIN","Invoice"])
-dfpr = dfpr.dropna(subset=["GSTIN","Invoice"])
+    df2b = df2b.dropna(subset=["GSTIN","Invoice"])
+    dfpr = dfpr.dropna(subset=["GSTIN","Invoice"])
 
 
-# -------- merge purchase and 2B --------
+    # Merge data
 
-recon = pd.merge(
-    dfpr,
-    df2b,
-    on=["GSTIN","Invoice"],
-    how="outer",
-    indicator=True
-)
-
-
-# -------- mismatch logic --------
-
-def check(row):
-
-    if row["_merge"] == "left_only":
-        return pd.Series(["Mismatch", "Missing in 2B"])
-
-    if row["_merge"] == "right_only":
-        return pd.Series(["Mismatch", "Missing in Purchase"])
-
-    reasons = []
-
-    if round(row["IGSTPR"],2) != round(row["IGST2B"],2):
-        reasons.append("IGST mismatch")
-
-    if round(row["CGSTPR"],2) != round(row["CGST2B"],2):
-        reasons.append("CGST mismatch")
-
-    if round(row["SGSTPR"],2) != round(row["SGST2B"],2):
-        reasons.append("SGST mismatch")
-
-    if len(reasons) == 0:
-        return pd.Series(["Matched",""])
-
-    return pd.Series(["Mismatch", ",".join(reasons)])
+    recon = pd.merge(
+        dfpr,
+        df2b,
+        on=["GSTIN","Invoice"],
+        how="outer",
+        indicator=True
+    )
 
 
-recon[["Status","Reason"]] = recon.apply(check, axis=1)
+    # Reconciliation logic
 
-recon = recon.drop(columns=["_merge"])
+    def check(row):
 
-# -------- mismatch logic --------
-
-def check(row):
-
-    if row["_merge"] == "left_only":
-        return pd.Series(["Mismatch", "Missing in 2B"])
-
-    if row["_merge"] == "right_only":
-        return pd.Series(["Mismatch", "Missing in Purchase"])
-
-    reasons = []
-
-    if round(row["IGSTPR"],2) != round(row["IGST2B"],2):
-        reasons.append("IGST mismatch")
-
-    if round(row["CGSTPR"],2) != round(row["CGST2B"],2):
-        reasons.append("CGST mismatch")
-
-    if round(row["SGSTPR"],2) != round(row["SGST2B"],2):
-        reasons.append("SGST mismatch")
-
-    if len(reasons) == 0:
-        return pd.Series(["Matched",""])
-
-    return pd.Series(["Mismatch", ",".join(reasons)])
-
-
-recon[["Status","Reason"]] = recon.apply(check, axis=1)
-
-recon = recon.drop(columns=["_merge"])
-
-
-    # -------- mismatch logic --------
-
-    def check(r):
-
-        if r["_merge"] == "left_only":
+        if row["_merge"] == "left_only":
             return pd.Series(["Mismatch","Missing in 2B"])
 
-        if r["_merge"] == "right_only":
+        if row["_merge"] == "right_only":
             return pd.Series(["Mismatch","Missing in Purchase"])
 
         reasons = []
 
-        if round(r["IGSTPR"],2) != round(r["IGST2B"],2):
+        if round(row["IGSTPR"],2) != round(row["IGST2B"],2):
             reasons.append("IGST mismatch")
 
-        if round(r["CGSTPR"],2) != round(r["CGST2B"],2):
+        if round(row["CGSTPR"],2) != round(row["CGST2B"],2):
             reasons.append("CGST mismatch")
 
-        if round(r["SGSTPR"],2) != round(r["SGST2B"],2):
+        if round(row["SGSTPR"],2) != round(row["SGST2B"],2):
             reasons.append("SGST mismatch")
 
         if len(reasons) == 0:
@@ -305,16 +227,16 @@ recon = recon.drop(columns=["_merge"])
     st.dataframe(recon, use_container_width=True)
 
 
-    # -------- export --------
+    # Export Excel
 
-    output = "GST_Reconciliation_Output.xlsx"
+    output_file = "GST_Reconciliation_Output.xlsx"
 
-    recon.to_excel(output, index=False)
+    recon.to_excel(output_file, index=False)
 
-    with open(output,"rb") as f:
+    with open(output_file,"rb") as f:
 
         st.download_button(
             "Download Excel",
             data=f,
-            file_name=output
+            file_name=output_file
         )
