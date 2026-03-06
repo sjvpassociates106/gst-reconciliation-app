@@ -99,8 +99,7 @@ def clean_invoice(inv):
 
     return ""
 
-df2b["Invoice"] = gstr2b[inv2b].apply(clean_invoice)
-dfpr["Invoice"] = purchase[invpr].apply(clean_invoice)
+
     
 
 
