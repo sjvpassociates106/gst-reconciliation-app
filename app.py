@@ -159,18 +159,21 @@ df2b["Integrated Tax"] = safe_num(gstr2b, igst2b)
 df2b["Central Tax"] = safe_num(gstr2b, cgst2b)
 df2b["State/UT Tax"] = safe_num(gstr2b, sgst2b)
 
-    dfpr = pd.DataFrame()
 
-    dfpr["GSTIN"] = purchase[gstinpr].astype(str).str.upper().str.strip()
-    dfpr["Supplier Invoice No."] = purchase[Inv nopr].apply(clean_invoice)
-    dfpr["Particular"] = purchase[party namepr].apply(clean_invoice)
-    dfpr["IGSTPR"] = safe_num(purchase, igstpr)
-    dfpr["CGSTPR"] = safe_num(purchase, cgstpr)
-    dfpr["SGSTPR"] = safe_num(purchase, sgstpr)
+dfpr = pd.DataFrame()
 
+dfpr["GSTIN"] = purchase[gstinpr].astype(str).str.upper().str.strip()
+dfpr["Supplier Invoice No."] = purchase[invpr].apply(clean_invoice)
+dfpr["Particular"] = purchase[party_namepr].apply(clean_invoice)
 
-    df2b = df2b.dropna(subset=["GSTIN","Invoice"])
-    dfpr = dfpr.dropna(subset=["GSTIN","Invoice"])
+dfpr["IGSTPR"] = safe_num(purchase, igstpr)
+dfpr["CGSTPR"] = safe_num(purchase, cgstpr)
+dfpr["SGSTPR"] = safe_num(purchase, sgstpr)
+
+# Remove empty rows
+
+df2b = df2b.dropna(subset=["GSTIN", "Invoice Number"])
+dfpr = dfpr.dropna(subset=["GSTIN", "Supplier Invoice No."])
 
 
     # -------------------------
