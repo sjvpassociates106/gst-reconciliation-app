@@ -184,15 +184,88 @@ if gstr2b_file and purchase_file:
     dfpr["SGSTPR"] = safe_get(purchase, sgstpr)
 
 
-    # -------- merge --------
+    
 
-   recon = pd.merge(
+# -------- merge purchase and 2B --------
+
+# -------- remove blank rows --------
+
+df2b = df2b.dropna(subset=["GSTIN","Invoice"])
+dfpr = dfpr.dropna(subset=["GSTIN","Invoice"])
+
+
+# -------- merge purchase and 2B --------
+
+recon = pd.merge(
     dfpr,
     df2b,
     on=["GSTIN","Invoice"],
     how="outer",
     indicator=True
 )
+
+
+# -------- mismatch logic --------
+
+def check(row):
+
+    if row["_merge"] == "left_only":
+        return pd.Series(["Mismatch", "Missing in 2B"])
+
+    if row["_merge"] == "right_only":
+        return pd.Series(["Mismatch", "Missing in Purchase"])
+
+    reasons = []
+
+    if round(row["IGSTPR"],2) != round(row["IGST2B"],2):
+        reasons.append("IGST mismatch")
+
+    if round(row["CGSTPR"],2) != round(row["CGST2B"],2):
+        reasons.append("CGST mismatch")
+
+    if round(row["SGSTPR"],2) != round(row["SGST2B"],2):
+        reasons.append("SGST mismatch")
+
+    if len(reasons) == 0:
+        return pd.Series(["Matched",""])
+
+    return pd.Series(["Mismatch", ",".join(reasons)])
+
+
+recon[["Status","Reason"]] = recon.apply(check, axis=1)
+
+recon = recon.drop(columns=["_merge"])
+
+# -------- mismatch logic --------
+
+def check(row):
+
+    if row["_merge"] == "left_only":
+        return pd.Series(["Mismatch", "Missing in 2B"])
+
+    if row["_merge"] == "right_only":
+        return pd.Series(["Mismatch", "Missing in Purchase"])
+
+    reasons = []
+
+    if round(row["IGSTPR"],2) != round(row["IGST2B"],2):
+        reasons.append("IGST mismatch")
+
+    if round(row["CGSTPR"],2) != round(row["CGST2B"],2):
+        reasons.append("CGST mismatch")
+
+    if round(row["SGSTPR"],2) != round(row["SGST2B"],2):
+        reasons.append("SGST mismatch")
+
+    if len(reasons) == 0:
+        return pd.Series(["Matched",""])
+
+    return pd.Series(["Mismatch", ",".join(reasons)])
+
+
+recon[["Status","Reason"]] = recon.apply(check, axis=1)
+
+recon = recon.drop(columns=["_merge"])
 
 
     # -------- mismatch logic --------
