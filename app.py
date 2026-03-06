@@ -75,26 +75,41 @@ if gstr_file and purchase_file:
 
     # -------- Load GSTR2B --------
 
-    xl = pd.ExcelFile(gstr_file)
+  # -------- Load GSTR2B properly --------
 
-    if "B2B" not in xl.sheet_names:
-        st.error("B2B sheet not found in GSTR-2B")
-        st.stop()
+xl = pd.ExcelFile(gstr_file)
 
-    gstr2b = xl.parse("B2B")
+raw = xl.parse("B2B", header=None)
 
-    gstr2b.columns = gstr2b.columns.str.strip()
+header_row = None
+
+for i in range(len(raw)):
+    row = raw.iloc[i].astype(str).str.lower()
+
+    if "gstin of supplier" in row.values:
+        header_row = i
+        break
+
+
+if header_row is None:
+    st.error("Could not detect header row in B2B sheet")
+    st.stop()
+
+
+gstr2b = xl.parse("B2B", header=header_row)
+
+gstr2b.columns = gstr2b.columns.str.strip()
 
 
     # Detect GSTR2B columns
 
     gstin2b = find_col(gstr2b.columns,"gstin")
-    party2b = find_col(gstr2b.columns,"trade")
-    inv2b = find_col(gstr2b.columns,"invoice")
+    party2b = find_col(gstr2b.columns,"trade of supplier")
+    inv2b = find_col(gstr2b.columns,"invoice Number")
 
-    igst2b = find_col(gstr2b.columns,"integrated")
-    cgst2b = find_col(gstr2b.columns,"central")
-    sgst2b = find_col(gstr2b.columns,"state")
+    igst2b = find_col(gstr2b.columns,"integrated tax")
+    cgst2b = find_col(gstr2b.columns,"central tax")
+    sgst2b = find_col(gstr2b.columns,"state tax")
 
 
     if gstin2b is None or inv2b is None:
@@ -111,7 +126,7 @@ if gstr_file and purchase_file:
 
 
     gstinpr = find_col(purchase.columns,"gstin")
-    invpr = find_col(purchase.columns,"invoice")
+    invpr = find_col(purchase.columns," Supplier invoice Number")
     party_namepr = find_col(purchase.columns,"particular")
 
     igstpr = find_col(purchase.columns,"igst")
