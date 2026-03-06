@@ -186,22 +186,21 @@ if gstr2b_file and purchase_file:
     })
 
 
-    dfpr=pd.DataFrame({
+    dfpr = pd.DataFrame()
 
-        "GSTIN": purchase[gstinpr].astype(str).str.strip().str.upper() if gstinpr else "",
+dfpr["GSTIN"] = purchase[gstinpr].astype(str).str.strip().str.upper() if gstinpr else pd.Series()
 
-        "Party_PR": purchase[namepr] if namepr else "",
+dfpr["Party_PR"] = purchase[namepr] if namepr else pd.Series()
 
-        "Invoice": purchase[invpr].apply(clean_invoice) if invpr else "",
+dfpr["Invoice"] = purchase[invpr].apply(clean_invoice) if invpr else pd.Series()
 
-        "Date_PR": pd.to_datetime(purchase[datepr],errors="coerce") if datepr else "",
+dfpr["Date_PR"] = pd.to_datetime(purchase[datepr],errors="coerce") if datepr else pd.Series()
 
-        "IGST_PR": safe_get(purchase,igstpr),
+dfpr["IGST_PR"] = safe_get(purchase,igstpr)
 
-        "CGST_PR": safe_get(purchase,cgstpr),
+dfpr["CGST_PR"] = safe_get(purchase,cgstpr)
 
-        "SGST_PR": safe_get(purchase,sgstpr)
-
+dfpr["SGST_PR"] = safe_get(purchase,sgstpr)
     })
 
 
