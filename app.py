@@ -7,7 +7,18 @@ st.title("GST 2B vs Purchase Register Reconciliation")
 
 gstr2b_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register File", type=["xlsx","xls"])
+# Check GSTR2B required columns
 
+if "GSTIN" not in df2b.columns or "Invoice" not in df2b.columns:
+    st.error("GSTR-2B required columns not detected. Check B2B sheet headers.")
+    st.stop()
+
+
+# Check Purchase Register required columns
+
+if "GSTIN" not in dfpr.columns or "Invoice" not in dfpr.columns:
+    st.error("Purchase Register required columns not detected.")
+    st.stop()
 
 # -----------------------------
 # Clean column name
