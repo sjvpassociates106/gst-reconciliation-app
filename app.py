@@ -148,15 +148,16 @@ if gstr_file and purchase_file:
     # Create Clean DataFrames
     # -------------------------
 
-   df2b = pd.DataFrame()
+
+df2b = pd.DataFrame()
 
 df2b["GSTIN of Supplier"] = gstr2b[gstin2b].astype(str).str.upper().str.strip()
 df2b["Invoice Number"] = gstr2b[inv2b].apply(clean_invoice)
-df2b["Trade/Legal name"] = gstr2b[Trade/Legal name2b].apply(clean_invoice)
+df2b["Trade/Legal name"] = gstr2b[trade_name2b].astype(str).str.strip()
+
 df2b["Integrated Tax"] = safe_num(gstr2b, igst2b)
 df2b["Central Tax"] = safe_num(gstr2b, cgst2b)
 df2b["State/UT Tax"] = safe_num(gstr2b, sgst2b)
-
 
     dfpr = pd.DataFrame()
 
