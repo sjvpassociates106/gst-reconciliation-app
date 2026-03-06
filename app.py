@@ -3,6 +3,19 @@ import pandas as pd
 import re
 
 # ---- Invoice cleaning function ----
+inv2b = None
+
+for col in gstr2b.columns:
+    c = str(col).lower()
+    if "invoice" in c:
+        inv2b = col
+        break
+
+if inv2b is None:
+    st.error("Invoice column not found in GSTR-2B")
+    st.stop()
+
+df2b["Invoice"] = gstr2b[inv2b].apply(clean_invoice)
 
 def clean_invoice(inv):
 
