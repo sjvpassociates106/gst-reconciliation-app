@@ -120,18 +120,60 @@ if gstr_file and purchase_file:
     # CLEAN DATAFRAMES
     # -----------------------------
 
-    df2b = pd.DataFrame()
+    # -----------------------------
+# Create Clean GSTR2B DataFrame
+# -----------------------------
 
-    df2b["GSTIN of Suppliers"] = gstr2b[gstin2b].astype(str).str.upper().str.strip()
-    df2b["Invoice number"] = gstr2b[inv2b].apply(clean_invoice)
-    df2b["trade name"] = gstr2b[party2b].astype(str).str.strip()
+df2b = pd.DataFrame()
 
-    df2b["Integrate Tax"] = safe_num(gstr2b, igst2b)
-    df2b["Central tax"] = safe_num(gstr2b, cgst2b)
-    df2b["State tax"] = safe_num(gstr2b, sgst2b)
+# Detect GSTIN column safely
+gstin2b = None
+for c in gstr2b.columns:
+    if "gstin" in str(c).lower():
+        gstin2b = c
+        break
+
+# Detect Invoice column safely
+inv2b = None
+for c in gstr2b.columns:
+    if "invoice" in str(c).lower():
+        inv2b = c
+        break
+
+# Detect Tax columns
+igst2b = None
+cgst2b = None
+sgst2b = None
+
+for c in gstr2b.columns:
+
+    name = str(c).lower()
+
+    if "integrated" in name:
+        igst2b = c
+
+    if "central" in name:
+        cgst2b = c
+
+    if "state" in name:
+        sgst2b = c
 
 
-    dfpr = pd.DataFrame()
+# Safety check
+if gstin2b is None or inv2b is None:
+    st.error("Required columns not found in GSTR-2B B2B sheet")
+    st.write("Detected columns:", gstr2b.columns)
+    st.stop()
+
+
+df2b["GSTIN"] = gstr2b[gstin2b].astype(str).str.upper().str.strip()
+df2b["Invoice"] = gstr2b[inv2b].apply(clean_invoice)
+
+df2b["IGST2B"] = safe_num(gstr2b, igst2b)
+df2b["CGST2B"] = safe_num(gstr2b, cgst2b)
+df2b["SGST2B"] = safe_num(gstr2b, sgst2b)
+    
+dfpr = pd.DataFrame()
 
     dfpr["GSTIN"] = purchase[gstinpr].astype(str).str.upper().str.strip()
     dfpr["Supplier Invoice Number"] = purchase[invpr].apply(clean_invoice)
