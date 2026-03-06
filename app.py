@@ -65,12 +65,12 @@ def clean_invoice(inv):
 
     inv = str(inv)
 
+    # split invoice by symbols
     parts = re.split(r'[/-]', inv)
 
     numbers = []
 
     for p in parts:
-
         num = re.sub(r'\D','',p)
 
         if num:
@@ -83,8 +83,6 @@ def clean_invoice(inv):
         return numbers[0]
 
     return ""
-
-
 # -----------------------------
 # LOAD GSTR2B B2B SHEET
 # -----------------------------
@@ -188,7 +186,13 @@ if gstr2b_file and purchase_file:
 
     # -------- merge --------
 
-    recon = pd.merge(dfpr, df2b, on=["GSTIN","Invoice"], how="outer", indicator=True)
+   recon = pd.merge(
+    dfpr,
+    df2b,
+    on=["GSTIN","Invoice"],
+    how="outer",
+    indicator=True
+)
 
 
     # -------- mismatch logic --------
