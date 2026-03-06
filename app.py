@@ -112,17 +112,14 @@ if gstr_file and purchase_file:
 
     # -------- Clean GSTR2B --------
 
-    df2b = pd.DataFrame()
+   df2b = pd.DataFrame()
 
-    df2b["GSTIN"] = gstr2b[gstin2b].astype(str).str.upper().str.strip()
+df2b["GSTIN"] = gstr2b[gstin2b].astype(str).str.upper().str.strip()
+df2b["Invoice"] = gstr2b[inv2b].apply(clean_invoice)
 
-    df2b["Invoice"] = gstr2b[inv2b].apply(clean_invoice)
-
-    df2b["Party"] = gstr2b[party2b].astype(str).str.upper().str.strip()
-
-    df2b["IGST2B"] = safe_num(gstr2b, igst2b)
-    df2b["CGST2B"] = safe_num(gstr2b, cgst2b)
-    df2b["SGST2B"] = safe_num(gstr2b, sgst2b)
+df2b["IGST2B"] = safe_num(gstr2b, igst2b)
+df2b["CGST2B"] = safe_num(gstr2b, cgst2b)
+df2b["SGST2B"] = safe_num(gstr2b, sgst2b)
 
 
     # -------- Clean Purchase Register --------
