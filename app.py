@@ -68,7 +68,7 @@ if gstr_file and purchase_file:
 
     df2b = pd.DataFrame()
 
-    df2b["GSTIN"] = gstr2b["gstin of supplier"].astype(str).str.strip().str.upper()
+    df2b["GSTIN"] = gstr2b["GSTIN of supplier"].astype(str).str.strip().str.upper()
 
     df2b["Party"] = gstr2b["trade/legal name"]
 
