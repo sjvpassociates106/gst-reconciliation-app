@@ -71,15 +71,24 @@ if gstr_file and purchase_file:
 
     # -------- Load GSTR2B --------
 
-    xl = pd.ExcelFile(gstr_file)
+    # -------- Load GSTR2B --------
 
-    if "B2B" not in xl.sheet_names:
-        st.error("B2B sheet not found in GSTR-2B")
-        st.stop()
+xl = pd.ExcelFile(gstr_file)
 
-    gstr2b = xl.parse("B2B")
+if "B2B" not in xl.sheet_names:
+    st.error("B2B sheet not found in GSTR-2B")
+    st.stop()
 
-    gstr2b.columns = gstr2b.columns.str.strip()
+# try multiple header rows
+for i in range(6):
+    gstr2b = xl.parse("B2B", header=i)
+
+    cols = [str(c).lower() for c in gstr2b.columns]
+
+    if any("gstin" in c for c in cols) and any("invoice" in c for c in cols):
+        break
+
+gstr2b.columns = gstr2b.columns.str.strip()
 
 
     # Detect required columns
