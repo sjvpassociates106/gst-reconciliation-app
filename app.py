@@ -72,7 +72,25 @@ if gstr_file and purchase_file:
 
     # -------- Load GSTR2B --------
 
-    gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=3)
+    # detect correct header row automatically
+temp = pd.read_excel(gstr_file, sheet_name="B2B", header=None)
+
+header_row = None
+
+for i in range(20):
+
+    row = " ".join(temp.iloc[i].astype(str).str.lower())
+
+    if "gstin" in row and "invoice" in row:
+        header_row = i
+        break
+
+if header_row is None:
+    st.error("Could not detect GSTIN / Invoice header row in B2B sheet")
+    st.write(temp.head(20))
+    st.stop()
+
+gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header_row)
 
     gstr2b = normalize(gstr2b)
 
