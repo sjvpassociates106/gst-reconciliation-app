@@ -3,7 +3,7 @@ import pandas as pd
 import re
 from io import BytesIO
 
-st.set_page_config(page_title="GST 2B Reconciliation", layout="wide")
+st.set_page_config(page_title="GST Reconciliation", layout="wide")
 
 st.title("GST 2B vs Purchase Register Reconciliation")
 
@@ -13,13 +13,14 @@ purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"]
 
 # -----------------------------
 # Clean Invoice
+# A/123/23-24 -> 123
 # -----------------------------
 def clean_invoice(inv):
 
     if pd.isna(inv):
         return ""
 
-    nums = re.findall(r'\d+', str(inv))
+    nums = re.findall(r"\d+", str(inv))
 
     if nums:
         return nums[0]
@@ -28,40 +29,22 @@ def clean_invoice(inv):
 
 
 # -----------------------------
-# Convert number safely
+# Safe numeric conversion
 # -----------------------------
 def num(series):
     return pd.to_numeric(series, errors="coerce").fillna(0)
 
 
 # -----------------------------
-# Detect header row automatically
+# Find column using keyword
 # -----------------------------
-def load_gstr2b(file):
+def find_col(cols, word):
 
-    xl = pd.ExcelFile(file)
+    for c in cols:
+        if word in c.lower():
+            return c
 
-    sheet = xl.parse("B2B", header=None)
-
-    header_row = None
-
-    for i in range(10):
-
-        row = sheet.iloc[i].astype(str).str.lower()
-
-        if "gstin" in " ".join(row.values) and "invoice" in " ".join(row.values):
-            header_row = i
-            break
-
-    if header_row is None:
-        st.error("Could not detect header row in B2B sheet")
-        st.stop()
-
-    df = xl.parse("B2B", header=header_row)
-
-    df.columns = df.columns.astype(str).str.strip()
-
-    return df
+    return None
 
 
 # =============================
@@ -72,47 +55,86 @@ if gstr_file and purchase_file:
     # -----------------------------
     # Load GSTR2B
     # -----------------------------
-    gstr2b = load_gstr2b(gstr_file)
+
+    xl = pd.ExcelFile(gstr_file)
+
+    raw = xl.parse("B2B", header=None)
+
+    header_row = None
+
+    for i in range(10):
+
+        row = raw.iloc[i].astype(str).str.lower()
+
+        if "gstin" in " ".join(row) and "invoice" in " ".join(row):
+            header_row = i
+            break
+
+    if header_row is None:
+        st.error("Could not detect header row in B2B sheet")
+        st.stop()
+
+    gstr2b = xl.parse("B2B", header=header_row)
+
+    gstr2b.columns = gstr2b.columns.astype(str).str.strip()
+
+    gstin_col = find_col(gstr2b.columns, "gstin")
+    party_col = find_col(gstr2b.columns, "trade")
+    inv_col = find_col(gstr2b.columns, "invoice")
+    tax_col = find_col(gstr2b.columns, "taxable")
+    igst_col = find_col(gstr2b.columns, "integrated")
+    cgst_col = find_col(gstr2b.columns, "central")
+    sgst_col = find_col(gstr2b.columns, "state")
 
     df2b = pd.DataFrame()
 
-    df2b["GSTIN"] = gstr2b["GSTIN of supplier"].astype(str).str.upper().str.strip()
-    df2b["Party"] = gstr2b["Trade/Legal name"]
-    df2b["Invoice"] = gstr2b["Invoice number"].apply(clean_invoice)
+    df2b["GSTIN"] = gstr2b[gstin_col].astype(str).str.upper().str.strip()
+    df2b["Party"] = gstr2b[party_col]
+    df2b["Invoice"] = gstr2b[inv_col].apply(clean_invoice)
 
-    df2b["Taxable2B"] = num(gstr2b["Taxable Value"])
-    df2b["IGST2B"] = num(gstr2b["Integrated Tax(₹)"])
-    df2b["CGST2B"] = num(gstr2b["Central Tax(₹)"])
-    df2b["SGST2B"] = num(gstr2b["State/UT Tax(₹)"])
+    df2b["Taxable2B"] = num(gstr2b[tax_col])
+    df2b["IGST2B"] = num(gstr2b[igst_col])
+    df2b["CGST2B"] = num(gstr2b[cgst_col])
+    df2b["SGST2B"] = num(gstr2b[sgst_col])
 
 
     # -----------------------------
     # Load Purchase Register
     # -----------------------------
+
     purchase = pd.read_excel(purchase_file)
 
     purchase.columns = purchase.columns.astype(str).str.strip()
 
+    gstin_pr = find_col(purchase.columns, "gst")
+    party_pr = find_col(purchase.columns, "particular")
+    inv_pr = find_col(purchase.columns, "invoice")
+    tax_pr = find_col(purchase.columns, "taxable")
+    igst_pr = find_col(purchase.columns, "igst")
+    cgst_pr = find_col(purchase.columns, "cgst")
+    sgst_pr = find_col(purchase.columns, "sgst")
+
     dfpr = pd.DataFrame()
 
-    dfpr["GSTIN"] = purchase["GSTiN/UIN"].astype(str).str.upper().str.strip()
-    dfpr["Party"] = purchase["Particular"]
-    dfpr["Invoice"] = purchase["Supplier Invoice Number"].apply(clean_invoice)
+    dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
+    dfpr["Party"] = purchase[party_pr]
+    dfpr["Invoice"] = purchase[inv_pr].apply(clean_invoice)
 
-    dfpr["TaxablePR"] = num(purchase["Taxable Value"])
-    dfpr["IGSTPR"] = num(purchase["IGST"])
-    dfpr["CGSTPR"] = num(purchase["CGST"])
-    dfpr["SGSTPR"] = num(purchase["SGST"])
+    dfpr["TaxablePR"] = num(purchase[tax_pr])
+    dfpr["IGSTPR"] = num(purchase[igst_pr])
+    dfpr["CGSTPR"] = num(purchase[cgst_pr])
+    dfpr["SGSTPR"] = num(purchase[sgst_pr])
 
 
     # Remove blank invoice
-    df2b = df2b[df2b["Invoice"] != ""]
-    dfpr = dfpr[dfpr["Invoice"] != ""]
+    df2b = df2b[df2b["Invoice"]!=""]
+    dfpr = dfpr[dfpr["Invoice"]!=""]
 
 
     # -----------------------------
     # Merge
     # -----------------------------
+
     recon = pd.merge(
         dfpr,
         df2b,
@@ -125,6 +147,7 @@ if gstr_file and purchase_file:
     # -----------------------------
     # Reconciliation Logic
     # -----------------------------
+
     def check(row):
 
         if row["_merge"] == "left_only":
@@ -158,6 +181,7 @@ if gstr_file and purchase_file:
     # -----------------------------
     # Dashboard
     # -----------------------------
+
     st.subheader("Summary")
 
     c1,c2,c3 = st.columns(3)
@@ -168,8 +192,9 @@ if gstr_file and purchase_file:
 
 
     # -----------------------------
-    # Result Table
+    # Show Result
     # -----------------------------
+
     st.subheader("Reconciliation Result")
 
     st.dataframe(recon,use_container_width=True)
@@ -178,6 +203,7 @@ if gstr_file and purchase_file:
     # -----------------------------
     # Excel Download
     # -----------------------------
+
     buffer = BytesIO()
 
     recon.to_excel(buffer,index=False)
