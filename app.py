@@ -13,7 +13,7 @@ purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"]
 
 # -----------------------------
 # Clean Invoice
-# A/123/23-24 -> 123
+# Example: A/123/23-24 -> 123
 # -----------------------------
 def clean_invoice(inv):
 
@@ -36,15 +36,23 @@ def num(series):
 
 
 # -----------------------------
-# Find column using keyword
+# Normalize column names
 # -----------------------------
-def find_col(cols, word):
+def normalize_cols(df):
 
-    for c in cols:
-        if word in c.lower():
-            return c
+    new_cols = []
 
-    return None
+    for c in df.columns:
+        c = str(c).lower()
+        c = c.replace("₹","")
+        c = c.replace("(","").replace(")","")
+        c = c.strip()
+
+        new_cols.append(c)
+
+    df.columns = new_cols
+
+    return df
 
 
 # =============================
@@ -53,14 +61,14 @@ def find_col(cols, word):
 if gstr_file and purchase_file:
 
     # -----------------------------
-    # Load GSTR2B
+    # Load GSTR-2B B2B sheet
     # -----------------------------
 
     xl = pd.ExcelFile(gstr_file)
 
     raw = xl.parse("B2B", header=None)
 
-    header_row = None
+    header_row = 0
 
     for i in range(10):
 
@@ -70,32 +78,31 @@ if gstr_file and purchase_file:
             header_row = i
             break
 
-    if header_row is None:
-        st.error("Could not detect header row in B2B sheet")
-        st.stop()
 
     gstr2b = xl.parse("B2B", header=header_row)
 
-    gstr2b.columns = gstr2b.columns.astype(str).str.strip()
+    gstr2b = normalize_cols(gstr2b)
 
-    gstin_col = find_col(gstr2b.columns, "gstin")
-    party_col = find_col(gstr2b.columns, "trade")
-    inv_col = find_col(gstr2b.columns, "invoice")
-    tax_col = find_col(gstr2b.columns, "taxable")
-    igst_col = find_col(gstr2b.columns, "integrated")
-    cgst_col = find_col(gstr2b.columns, "central")
-    sgst_col = find_col(gstr2b.columns, "state")
+
+    # -----------------------------
+    # Create GSTR2B dataframe
+    # -----------------------------
 
     df2b = pd.DataFrame()
 
-    df2b["GSTIN"] = gstr2b[gstin_col].astype(str).str.upper().str.strip()
-    df2b["Party"] = gstr2b[party_col]
-    df2b["Invoice"] = gstr2b[inv_col].apply(clean_invoice)
+    df2b["GSTIN"] = gstr2b["gstin of supplier"].astype(str).str.upper().str.strip()
 
-    df2b["Taxable2B"] = num(gstr2b[tax_col])
-    df2b["IGST2B"] = num(gstr2b[igst_col])
-    df2b["CGST2B"] = num(gstr2b[cgst_col])
-    df2b["SGST2B"] = num(gstr2b[sgst_col])
+    df2b["Party"] = gstr2b["trade/legal name"]
+
+    df2b["Invoice"] = gstr2b["invoice number"].apply(clean_invoice)
+
+    df2b["Taxable2B"] = num(gstr2b["taxable value"])
+
+    df2b["IGST2B"] = num(gstr2b["integrated tax"])
+
+    df2b["CGST2B"] = num(gstr2b["central tax"])
+
+    df2b["SGST2B"] = num(gstr2b["state/ut tax"])
 
 
     # -----------------------------
@@ -104,26 +111,24 @@ if gstr_file and purchase_file:
 
     purchase = pd.read_excel(purchase_file)
 
-    purchase.columns = purchase.columns.astype(str).str.strip()
+    purchase = normalize_cols(purchase)
 
-    gstin_pr = find_col(purchase.columns, "gst")
-    party_pr = find_col(purchase.columns, "particular")
-    inv_pr = find_col(purchase.columns, "invoice")
-    tax_pr = find_col(purchase.columns, "taxable")
-    igst_pr = find_col(purchase.columns, "igst")
-    cgst_pr = find_col(purchase.columns, "cgst")
-    sgst_pr = find_col(purchase.columns, "sgst")
 
     dfpr = pd.DataFrame()
 
-    dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
-    dfpr["Party"] = purchase[party_pr]
-    dfpr["Invoice"] = purchase[inv_pr].apply(clean_invoice)
+    dfpr["GSTIN"] = purchase["gstin/uin"].astype(str).str.upper().str.strip()
 
-    dfpr["TaxablePR"] = num(purchase[tax_pr])
-    dfpr["IGSTPR"] = num(purchase[igst_pr])
-    dfpr["CGSTPR"] = num(purchase[cgst_pr])
-    dfpr["SGSTPR"] = num(purchase[sgst_pr])
+    dfpr["Party"] = purchase["particular"]
+
+    dfpr["Invoice"] = purchase["supplier invoice number"].apply(clean_invoice)
+
+    dfpr["TaxablePR"] = num(purchase["taxable value"])
+
+    dfpr["IGSTPR"] = num(purchase["igst"])
+
+    dfpr["CGSTPR"] = num(purchase["cgst"])
+
+    dfpr["SGSTPR"] = num(purchase["sgst"])
 
 
     # Remove blank invoice
@@ -132,7 +137,7 @@ if gstr_file and purchase_file:
 
 
     # -----------------------------
-    # Merge
+    # Merge data
     # -----------------------------
 
     recon = pd.merge(
@@ -201,7 +206,7 @@ if gstr_file and purchase_file:
 
 
     # -----------------------------
-    # Excel Download
+    # Download Excel
     # -----------------------------
 
     buffer = BytesIO()
