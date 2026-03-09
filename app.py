@@ -3,7 +3,7 @@ import pandas as pd
 import re
 from io import BytesIO
 
-st.set_page_config(page_title="GST Reconciliation", layout="wide")
+st.set_page_config(page_title="GST 2B Reconciliation", layout="wide")
 
 st.title("GST 2B vs Purchase Register Reconciliation")
 
@@ -12,8 +12,8 @@ purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"]
 
 
 # -----------------------------
-# Clean Invoice
-# Example: A/123/23-24 -> 123
+# Clean invoice
+# A/123/23-24 -> 123
 # -----------------------------
 def clean_invoice(inv):
 
@@ -29,7 +29,7 @@ def clean_invoice(inv):
 
 
 # -----------------------------
-# Safe numeric conversion
+# Numeric safe
 # -----------------------------
 def num(series):
     return pd.to_numeric(series, errors="coerce").fillna(0)
@@ -40,19 +40,32 @@ def num(series):
 # -----------------------------
 def normalize_cols(df):
 
-    new_cols = []
+    cols = []
 
     for c in df.columns:
+
         c = str(c).lower()
         c = c.replace("₹","")
         c = c.replace("(","").replace(")","")
         c = c.strip()
 
-        new_cols.append(c)
+        cols.append(c)
 
-    df.columns = new_cols
+    df.columns = cols
 
     return df
+
+
+# -----------------------------
+# Find column
+# -----------------------------
+def find_col(columns, word):
+
+    for c in columns:
+        if word in c:
+            return c
+
+    return None
 
 
 # =============================
@@ -61,7 +74,7 @@ def normalize_cols(df):
 if gstr_file and purchase_file:
 
     # -----------------------------
-    # Load GSTR-2B B2B sheet
+    # Load GSTR2B
     # -----------------------------
 
     xl = pd.ExcelFile(gstr_file)
@@ -75,6 +88,7 @@ if gstr_file and purchase_file:
         row = raw.iloc[i].astype(str).str.lower()
 
         if "gstin" in " ".join(row) and "invoice" in " ".join(row):
+
             header_row = i
             break
 
@@ -84,25 +98,25 @@ if gstr_file and purchase_file:
     gstr2b = normalize_cols(gstr2b)
 
 
-    # -----------------------------
-    # Create GSTR2B dataframe
-    # -----------------------------
+    gstin_col = find_col(gstr2b.columns, "gstin")
+    party_col = find_col(gstr2b.columns, "trade")
+    inv_col = find_col(gstr2b.columns, "invoice")
+    tax_col = find_col(gstr2b.columns, "taxable")
+    igst_col = find_col(gstr2b.columns, "integrated")
+    cgst_col = find_col(gstr2b.columns, "central")
+    sgst_col = find_col(gstr2b.columns, "state")
+
 
     df2b = pd.DataFrame()
 
-    df2b["GSTIN"] = gstr2b["gstin of supplier"].astype(str).str.upper().str.strip()
+    df2b["GSTIN"] = gstr2b[gstin_col].astype(str).str.upper().str.strip()
+    df2b["Party"] = gstr2b[party_col]
+    df2b["Invoice"] = gstr2b[inv_col].apply(clean_invoice)
 
-    df2b["Party"] = gstr2b["trade/legal name"]
-
-    df2b["Invoice"] = gstr2b["invoice number"].apply(clean_invoice)
-
-    df2b["Taxable2B"] = num(gstr2b["taxable value"])
-
-    df2b["IGST2B"] = num(gstr2b["integrated tax"])
-
-    df2b["CGST2B"] = num(gstr2b["central tax"])
-
-    df2b["SGST2B"] = num(gstr2b["state/ut tax"])
+    df2b["Taxable2B"] = num(gstr2b[tax_col])
+    df2b["IGST2B"] = num(gstr2b[igst_col])
+    df2b["CGST2B"] = num(gstr2b[cgst_col])
+    df2b["SGST2B"] = num(gstr2b[sgst_col])
 
 
     # -----------------------------
@@ -114,30 +128,34 @@ if gstr_file and purchase_file:
     purchase = normalize_cols(purchase)
 
 
+    gstin_pr = find_col(purchase.columns,"gst")
+    party_pr = find_col(purchase.columns,"particular")
+    inv_pr = find_col(purchase.columns,"invoice")
+    tax_pr = find_col(purchase.columns,"taxable")
+    igst_pr = find_col(purchase.columns,"igst")
+    cgst_pr = find_col(purchase.columns,"cgst")
+    sgst_pr = find_col(purchase.columns,"sgst")
+
+
     dfpr = pd.DataFrame()
 
-    dfpr["GSTIN"] = purchase["gstin/uin"].astype(str).str.upper().str.strip()
+    dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
+    dfpr["Party"] = purchase[party_pr]
+    dfpr["Invoice"] = purchase[inv_pr].apply(clean_invoice)
 
-    dfpr["Party"] = purchase["particular"]
-
-    dfpr["Invoice"] = purchase["supplier invoice number"].apply(clean_invoice)
-
-    dfpr["TaxablePR"] = num(purchase["taxable value"])
-
-    dfpr["IGSTPR"] = num(purchase["igst"])
-
-    dfpr["CGSTPR"] = num(purchase["cgst"])
-
-    dfpr["SGSTPR"] = num(purchase["sgst"])
+    dfpr["TaxablePR"] = num(purchase[tax_pr])
+    dfpr["IGSTPR"] = num(purchase[igst_pr])
+    dfpr["CGSTPR"] = num(purchase[cgst_pr])
+    dfpr["SGSTPR"] = num(purchase[sgst_pr])
 
 
-    # Remove blank invoice
+    # remove blank invoices
     df2b = df2b[df2b["Invoice"]!=""]
     dfpr = dfpr[dfpr["Invoice"]!=""]
 
 
     # -----------------------------
-    # Merge data
+    # Merge
     # -----------------------------
 
     recon = pd.merge(
@@ -155,30 +173,30 @@ if gstr_file and purchase_file:
 
     def check(row):
 
-        if row["_merge"] == "left_only":
+        if row["_merge"]=="left_only":
             return pd.Series(["Mismatch","Missing in GSTR2B"])
 
-        if row["_merge"] == "right_only":
+        if row["_merge"]=="right_only":
             return pd.Series(["Mismatch","Missing in Purchase Register"])
 
-        reasons = []
+        reasons=[]
 
-        if round(row["IGSTPR"],2) != round(row["IGST2B"],2):
+        if round(row["IGSTPR"],2)!=round(row["IGST2B"],2):
             reasons.append("IGST mismatch")
 
-        if round(row["CGSTPR"],2) != round(row["CGST2B"],2):
+        if round(row["CGSTPR"],2)!=round(row["CGST2B"],2):
             reasons.append("CGST mismatch")
 
-        if round(row["SGSTPR"],2) != round(row["SGST2B"],2):
+        if round(row["SGSTPR"],2)!=round(row["SGST2B"],2):
             reasons.append("SGST mismatch")
 
-        if not reasons:
+        if len(reasons)==0:
             return pd.Series(["Matched",""])
 
         return pd.Series(["Mismatch",",".join(reasons)])
 
 
-    recon[["Status","Reason"]] = recon.apply(check, axis=1)
+    recon[["Status","Reason"]] = recon.apply(check,axis=1)
 
     recon = recon.drop(columns=["_merge"])
 
@@ -196,19 +214,13 @@ if gstr_file and purchase_file:
     c3.metric("Mismatch",(recon["Status"]=="Mismatch").sum())
 
 
-    # -----------------------------
-    # Show Result
-    # -----------------------------
-
+    # show result
     st.subheader("Reconciliation Result")
 
     st.dataframe(recon,use_container_width=True)
 
 
-    # -----------------------------
-    # Download Excel
-    # -----------------------------
-
+    # excel download
     buffer = BytesIO()
 
     recon.to_excel(buffer,index=False)
