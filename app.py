@@ -69,11 +69,13 @@ def safe_num(df,col):
 # =============================
 if gstr_file and purchase_file:
 
-    # -------- Load GSTR2B --------
+    xl = pd.ExcelFile(gstr_file)
 
-    # -------- Load GSTR2B --------
+    gstr2b = xl.parse("B2B", header=3)
 
-xl = pd.ExcelFile(gstr_file)
+    purchase = pd.read_excel(purchase_file)
+
+    # processing code
 
 if "B2B" not in xl.sheet_names:
     st.error("B2B sheet not found in GSTR-2B")
