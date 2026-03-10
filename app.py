@@ -155,17 +155,14 @@ purchase = pd.read_excel(purchase_file, header=header_row_pr)
 
 purchase = normalize(purchase)
 
+gstin_pr = find_col(purchase.columns,"gstin") or find_col(purchase.columns,"gst")
+party_pr = find_col(purchase.columns,"particular")
+invoice_pr = find_col(purchase.columns,"invoice")
+taxable_pr = find_col(purchase.columns,"taxable")
 
-    gstin_pr = find_col(purchase.columns,"gstin/Uin") or find_col(purchase.columns,"gstin/Uin")
-
-    party_pr = find_col(purchase.columns,"particular")
-    invoice_pr = find_col(purchase.columns,"invoice")
-    taxable_pr = find_col(purchase.columns,"taxable")
-
-    igst_pr = find_col(purchase.columns,"igst")
-    cgst_pr = find_col(purchase.columns,"cgst")
-    sgst_pr = find_col(purchase.columns,"sgst")
-
+igst_pr = find_col(purchase.columns,"igst")
+cgst_pr = find_col(purchase.columns,"cgst")
+sgst_pr = find_col(purchase.columns,"sgst")
 
     if gstin_pr is None:
 
