@@ -7,37 +7,34 @@ st.set_page_config(page_title="GST 2B Reconciliation", layout="wide")
 
 st.title("GST 2B vs Purchase Register Reconciliation")
 
-gstr_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
+gstr_file = st.file_uploader("Upload GSTR-2B", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"])
 
 
+# -----------------------------
+# Clean invoice number
+# Example: 258/25-26 → 258
+# -----------------------------
 def clean_invoice(inv):
 
     if pd.isna(inv):
         return ""
 
-    inv = str(inv)
+    nums = re.findall(r'\d{3,5}', str(inv))
 
-    # find 3-5 digit number
-    nums = re.findall(r'\d{3,5}', inv)
-
-    if nums:
-        return nums[0]
-
-    return ""
+    return nums[0] if nums else ""
 
 
-# -------------------------
-# numeric conversion
-# -------------------------
+# -----------------------------
+# Numeric conversion
+# -----------------------------
 def num(x):
-
     return pd.to_numeric(x, errors="coerce").fillna(0)
 
 
-# -------------------------
-# normalize column names
-# -------------------------
+# -----------------------------
+# Normalize columns
+# -----------------------------
 def normalize(df):
 
     df.columns = (
@@ -52,9 +49,9 @@ def normalize(df):
     return df
 
 
-# -------------------------
-# find column safely
-# -------------------------
+# -----------------------------
+# Find column
+# -----------------------------
 def find_col(cols, word):
 
     for c in cols:
@@ -64,9 +61,9 @@ def find_col(cols, word):
     return None
 
 
-# -------------------------
-# detect header row
-# -------------------------
+# -----------------------------
+# Detect header row
+# -----------------------------
 def detect_header(file, sheet):
 
     temp = pd.read_excel(file, sheet_name=sheet, header=None)
@@ -81,21 +78,22 @@ def detect_header(file, sheet):
     return 0
 
 
-# =========================
+# =============================
 # PROCESS
-# =========================
+# =============================
 
 if gstr_file and purchase_file:
 
-    # Load GSTR2B
+    # -------------------------
+    # Load GSTR-2B
+    # -------------------------
+
     header2b = detect_header(gstr_file, "B2B")
+
     gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header2b)
+
     gstr2b = normalize(gstr2b)
 
-    # Load Purchase Register
-    headerpr = detect_header(purchase_file, 0)
-    purchase = pd.read_excel(purchase_file, header=headerpr)
-    purchase = normalize(purchase)
 
     gstin_col = find_col(gstr2b.columns,"gstin")
     party_col = find_col(gstr2b.columns,"trade")
@@ -119,18 +117,20 @@ if gstr_file and purchase_file:
     df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
     df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
 
-# remove duplicate invoices from GSTR2B
-df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).agg({
 
-    "Party":"first",
-    "Taxable2B":"sum",
-    "IGST2B":"sum",
-    "CGST2B":"sum",
-    "SGST2B":"sum"
+    # Remove duplicates
+    df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).sum()
 
-})
 
-    
+    # -------------------------
+    # Load Purchase Register
+    # -------------------------
+
+    headerpr = detect_header(purchase_file,0)
+
+    purchase = pd.read_excel(purchase_file, header=headerpr)
+
+    purchase = normalize(purchase)
 
 
     gstin_pr = find_col(purchase.columns,"gstin") or find_col(purchase.columns,"gst")
@@ -156,29 +156,21 @@ df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).agg({
     dfpr["SGSTPR"] = num(purchase[sgst_pr]) if sgst_pr else 0
 
 
-    # remove blank invoice
-    df2b = df2b[df2b["Invoice"]!=""]
-    dfpr = dfpr[dfpr["Invoice"]!=""]
-
-
     # -------------------------
-    # merge
+    # Merge
     # -------------------------
 
     recon = pd.merge(
-
         dfpr,
         df2b,
-
         on=["GSTIN","Invoice"],
-
         how="outer",
         indicator=True
     )
 
 
     # -------------------------
-    # reconciliation logic
+    # Reconciliation logic
     # -------------------------
 
     def check(r):
@@ -214,37 +206,18 @@ df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).agg({
     recon = recon.drop(columns=["_merge"])
 
 
-    # -------------------------
-    # summary
-    # -------------------------
-
-    st.subheader("Summary")
-
-    col1,col2,col3 = st.columns(3)
-
-    col1.metric("Total",len(recon))
-    col2.metric("Matched",(recon["Status"]=="Matched").sum())
-    col3.metric("Mismatch",(recon["Status"]=="Mismatch").sum())
-
-
     st.subheader("Reconciliation Result")
 
     st.dataframe(recon,use_container_width=True)
 
 
-    # -------------------------
     # Excel download
-    # -------------------------
-
     buffer = BytesIO()
 
     recon.to_excel(buffer,index=False)
 
     st.download_button(
-
         "Download Excel Report",
-
         buffer.getvalue(),
-
         "GST_Reconciliation_Output.xlsx"
     )
