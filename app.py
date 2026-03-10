@@ -3,7 +3,7 @@ import pandas as pd
 import re
 from io import BytesIO
 
-st.set_page_config(page_title="GST Reconciliation Tool", layout="wide")
+st.set_page_config(page_title="GST 2B Reconciliation", layout="wide")
 
 st.title("GST 2B vs Purchase Register Reconciliation")
 
@@ -12,7 +12,7 @@ purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"]
 
 
 # -----------------------------
-# Clean Invoice
+# Clean invoice
 # Example: A/123/23-24 → 123
 # -----------------------------
 def clean_invoice(inv):
@@ -22,14 +22,11 @@ def clean_invoice(inv):
 
     nums = re.findall(r"\d+", str(inv))
 
-    if nums:
-        return nums[0]
-
-    return ""
+    return nums[0] if nums else ""
 
 
 # -----------------------------
-# Safe numeric conversion
+# Numeric conversion
 # -----------------------------
 def num(series):
 
@@ -54,7 +51,7 @@ def normalize(df):
 
 
 # -----------------------------
-# Safe column finder
+# Find column safely
 # -----------------------------
 def find_col(cols, keyword):
 
@@ -65,35 +62,41 @@ def find_col(cols, keyword):
     return None
 
 
+# -----------------------------
+# Detect header row automatically
+# -----------------------------
+def detect_header(file):
+
+    temp = pd.read_excel(file, sheet_name="B2B", header=None)
+
+    for i in range(20):
+
+        row = " ".join(temp.iloc[i].astype(str).str.lower())
+
+        if "gstin" in row and "invoice" in row:
+            return i
+
+    return None
+
+
 # =============================
 # PROCESS
 # =============================
 if gstr_file and purchase_file:
 
-    # -------- Load GSTR2B --------
+    header_row = detect_header(gstr_file)
 
-    # detect correct header row automatically
-temp = pd.read_excel(gstr_file, sheet_name="B2B", header=None)
+    if header_row is None:
 
-header_row = None
+        st.error("Could not detect B2B table header")
 
-for i in range(20):
+        st.stop()
 
-    row = " ".join(temp.iloc[i].astype(str).str.lower())
-
-    if "gstin" in row and "invoice" in row:
-        header_row = i
-        break
-
-if header_row is None:
-    st.error("Could not detect GSTIN / Invoice header row in B2B sheet")
-    st.write(temp.head(20))
-    st.stop()
-
-gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header_row)
+    gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header_row)
 
     gstr2b = normalize(gstr2b)
 
+    # detect columns
     gstin_col = find_col(gstr2b.columns,"gstin")
     party_col = find_col(gstr2b.columns,"trade")
     invoice_col = find_col(gstr2b.columns,"invoice")
@@ -105,12 +108,11 @@ gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header_row)
 
     if gstin_col is None or invoice_col is None:
 
-        st.error("GSTIN or Invoice column not found in B2B sheet")
+        st.error("GSTIN or Invoice column not found")
 
         st.write("Detected columns:", gstr2b.columns)
 
         st.stop()
-
 
     df2b = pd.DataFrame()
 
@@ -125,8 +127,9 @@ gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header_row)
     df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
 
 
-    # -------- Load Purchase Register --------
-
+    # -----------------------------
+    # Purchase Register
+    # -----------------------------
     purchase = pd.read_excel(purchase_file)
 
     purchase = normalize(purchase)
@@ -139,7 +142,6 @@ gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header_row)
     igst_pr = find_col(purchase.columns,"igst")
     cgst_pr = find_col(purchase.columns,"cgst")
     sgst_pr = find_col(purchase.columns,"sgst")
-
 
     dfpr = pd.DataFrame()
 
@@ -154,13 +156,14 @@ gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header_row)
     dfpr["SGSTPR"] = num(purchase[sgst_pr]) if sgst_pr else 0
 
 
-    # Remove empty invoice
+    # Remove blank invoices
     df2b = df2b[df2b["Invoice"]!=""]
     dfpr = dfpr[dfpr["Invoice"]!=""]
 
 
-    # -------- Merge --------
-
+    # -----------------------------
+    # Merge
+    # -----------------------------
     recon = pd.merge(
         dfpr,
         df2b,
@@ -170,8 +173,9 @@ gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header_row)
     )
 
 
-    # -------- Reconciliation Logic --------
-
+    # -----------------------------
+    # Reconciliation Logic
+    # -----------------------------
     def check(row):
 
         if row["_merge"]=="left_only":
@@ -202,19 +206,23 @@ gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header_row)
     recon = recon.drop(columns=["_merge"])
 
 
+    # -----------------------------
+    # Show result
+    # -----------------------------
     st.subheader("Reconciliation Result")
 
     st.dataframe(recon,use_container_width=True)
 
 
-    # -------- Excel Download --------
-
+    # -----------------------------
+    # Download Excel
+    # -----------------------------
     buffer = BytesIO()
 
     recon.to_excel(buffer,index=False)
 
     st.download_button(
-        "Download Excel",
+        "Download Excel Report",
         buffer.getvalue(),
         "GST_Reconciliation_Output.xlsx"
     )
