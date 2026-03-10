@@ -124,13 +124,36 @@ if gstr_file and purchase_file:
     df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
 
 
-    # -------------------------
-    # PURCHASE REGISTER
-    # -------------------------
 
-    purchase = pd.read_excel(purchase_file)
+    # -------------------------
+# Detect Purchase Register header
+# -------------------------
 
-    purchase = normalize(purchase)
+temp_pr = pd.read_excel(purchase_file, header=None)
+
+header_row_pr = None
+
+for i in range(20):
+
+    row = " ".join(temp_pr.iloc[i].astype(str).str.lower())
+
+    if "invoice" in row and "gst" in row:
+        header_row_pr = i
+        break
+
+
+if header_row_pr is None:
+
+    st.error("Could not detect Purchase Register header")
+
+    st.write(temp_pr.head(20))
+
+    st.stop()
+
+
+purchase = pd.read_excel(purchase_file, header=header_row_pr)
+
+purchase = normalize(purchase)
 
 
     gstin_pr = find_col(purchase.columns,"gstin") or find_col(purchase.columns,"gst")
