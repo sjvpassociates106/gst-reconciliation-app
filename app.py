@@ -164,13 +164,13 @@ igst_pr = find_col(purchase.columns,"igst")
 cgst_pr = find_col(purchase.columns,"cgst")
 sgst_pr = find_col(purchase.columns,"sgst")
 
-    if gstin_pr is None:
+if gstin_pr is None:
 
-        st.error("GSTIN column not found in Purchase Register")
+    st.error("GSTIN column not found in Purchase Register")
 
-        st.write(purchase.columns)
+    st.write(purchase.columns)
 
-        st.stop()
+    st.stop()
 
 
     dfpr = pd.DataFrame()
