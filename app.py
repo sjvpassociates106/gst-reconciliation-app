@@ -16,22 +16,15 @@ def clean_invoice(inv):
     if pd.isna(inv):
         return ""
 
-    inv = str(inv).upper()
+    inv = str(inv)
 
-    # pattern 26-274
-    m = re.search(r"\d{2}-\d+", inv)
-    if m:
-        return m.group()
+    # find 3-5 digit number
+    nums = re.findall(r'\d{3,5}', inv)
 
-    # pattern S1804
-    m = re.search(r"[A-Z]\d{3,}", inv)
-    if m:
-        return m.group()
+    if nums:
+        return nums[0]
 
-    # fallback remove symbols
-    inv = re.sub(r"[^A-Z0-9]", "", inv)
-
-    return inv
+    return ""
 
 
 # -------------------------
