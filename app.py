@@ -90,13 +90,10 @@ if gstr_file and purchase_file:
     # -------------------------
     # Load GSTR2B
     # -------------------------
-
     header2b = detect_header(gstr_file,"B2B")
-
     gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header2b)
 
     gstr2b = normalize(gstr2b)
-
 
     gstin_col = find_col(gstr2b.columns,"gstin")
     party_col = find_col(gstr2b.columns,"trade")
