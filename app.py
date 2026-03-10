@@ -127,13 +127,7 @@ if gstr_file and purchase_file:
     df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
     df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
 
-df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).agg({
-    "Party":"first",
-    "Taxable2B":"sum",
-    "IGST2B":"sum",
-    "CGST2B":"sum",
-    "SGST2B":"sum"
-})
+
     # -------------------------
     # Load Purchase Register
     # -------------------------
