@@ -3,7 +3,7 @@ import pandas as pd
 import re
 from io import BytesIO
 
-st.set_page_config(page_title="GST 2B vs Purchase Reconciliation", layout="wide")
+st.set_page_config(page_title="GST 2B Reconciliation", layout="wide")
 
 st.title("GST 2B vs Purchase Register Reconciliation")
 
@@ -11,10 +11,10 @@ gstr_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"])
 
 
-# -----------------------------
+# -------------------------
 # Extract invoice number
 # Example: 258/25-26 → 258
-# -----------------------------
+# -------------------------
 def clean_invoice(inv):
 
     if pd.isna(inv):
@@ -25,17 +25,17 @@ def clean_invoice(inv):
     return nums[0] if nums else ""
 
 
-# -----------------------------
+# -------------------------
 # Numeric conversion
-# -----------------------------
+# -------------------------
 def num(series):
 
     return pd.to_numeric(series, errors="coerce").fillna(0)
 
 
-# -----------------------------
+# -------------------------
 # Normalize column names
-# -----------------------------
+# -------------------------
 def normalize(df):
 
     df.columns = (
@@ -50,9 +50,9 @@ def normalize(df):
     return df
 
 
-# -----------------------------
+# -------------------------
 # Find column safely
-# -----------------------------
+# -------------------------
 def find_col(cols, word):
 
     for c in cols:
@@ -62,9 +62,9 @@ def find_col(cols, word):
     return None
 
 
-# -----------------------------
+# -------------------------
 # Detect header row
-# -----------------------------
+# -------------------------
 def detect_header(file, sheet):
 
     temp = pd.read_excel(file, sheet_name=sheet, header=None)
@@ -79,14 +79,14 @@ def detect_header(file, sheet):
     return 0
 
 
-# =============================
+# =========================
 # PROCESS
-# =============================
+# =========================
 
 if gstr_file and purchase_file:
 
     # -------------------------
-    # Load GSTR-2B B2B Sheet
+    # Load GSTR-2B
     # -------------------------
 
     header2b = detect_header(gstr_file, "B2B")
@@ -96,12 +96,13 @@ if gstr_file and purchase_file:
     gstr2b = normalize(gstr2b)
 
 
-    # Detect columns
     gstin_col = find_col(gstr2b.columns,"gstin")
     party_col = find_col(gstr2b.columns,"trade")
     invoice_col = find_col(gstr2b.columns,"invoice")
     taxable_col = find_col(gstr2b.columns,"taxable")
 
+
+    # Detect tax columns
     igst_col = next((c for c in gstr2b.columns if "integrated" in c), None)
     cgst_col = next((c for c in gstr2b.columns if "central" in c), None)
     sgst_col = next((c for c in gstr2b.columns if "state" in c or "ut" in c), None)
@@ -115,12 +116,12 @@ if gstr_file and purchase_file:
 
     df2b["Taxable2B"] = num(gstr2b[taxable_col])
 
-   igst_col = next((c for c in gstr2b.columns if "integrated" in c), None)
-   cgst_col = next((c for c in gstr2b.columns if "central" in c), None)
-   sgst_col = next((c for c in gstr2b.columns if "state" in c or "ut" in c), None)
+    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
+    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
+    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
 
 
-    # Remove duplicate invoices from 2B
+    # Remove duplicates
     df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).sum()
 
 
@@ -159,7 +160,7 @@ if gstr_file and purchase_file:
 
 
     # -------------------------
-    # Merge data
+    # Merge
     # -------------------------
 
     recon = pd.merge(
@@ -172,60 +173,56 @@ if gstr_file and purchase_file:
 
 
     # -------------------------
-    # Reconciliation logic
+    # Reconciliation Logic
     # -------------------------
 
-    def check(r):
+    def check(row):
 
-        if r["_merge"]=="left_only":
+        if row["_merge"] == "left_only":
             return pd.Series(["Mismatch","Missing in 2B"])
 
-        if r["_merge"]=="right_only":
+        if row["_merge"] == "right_only":
             return pd.Series(["Mismatch","Missing in Purchase"])
 
-        reasons=[]
+        reasons = []
 
-        tol = 1  # ₹1 tolerance
+        tol = 1   # ₹1 tolerance
 
-        if abs(r["TaxablePR"] - r["Taxable2B"]) > tol:
+        if abs(row["TaxablePR"] - row["Taxable2B"]) > tol:
             reasons.append("Taxable mismatch")
 
-        if abs(r["IGSTPR"] - r["IGST2B"]) > tol:
+        if abs(row["IGSTPR"] - row["IGST2B"]) > tol:
             reasons.append("IGST mismatch")
 
-        if abs(r["CGSTPR"] - r["CGST2B"]) > tol:
+        if abs(row["CGSTPR"] - row["CGST2B"]) > tol:
             reasons.append("CGST mismatch")
 
-        if abs(r["SGSTPR"] - r["SGST2B"]) > tol:
+        if abs(row["SGSTPR"] - row["SGST2B"]) > tol:
             reasons.append("SGST mismatch")
 
-        if len(reasons)==0:
+        if len(reasons) == 0:
             return pd.Series(["Matched",""])
 
         return pd.Series(["Mismatch",",".join(reasons)])
 
 
-    recon[["Status","Reason"]] = recon.apply(check,axis=1)
+    recon[["Status","Reason"]] = recon.apply(check, axis=1)
 
     recon = recon.drop(columns=["_merge"])
 
 
-    # -------------------------
-    # Display result
-    # -------------------------
-
     st.subheader("Reconciliation Result")
 
-    st.dataframe(recon,use_container_width=True)
+    st.dataframe(recon, use_container_width=True)
 
 
     # -------------------------
-    # Excel Download
+    # Excel download
     # -------------------------
 
     buffer = BytesIO()
 
-    recon.to_excel(buffer,index=False)
+    recon.to_excel(buffer, index=False)
 
     st.download_button(
         "Download Excel Report",
