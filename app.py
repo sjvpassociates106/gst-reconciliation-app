@@ -156,7 +156,7 @@ purchase = pd.read_excel(purchase_file, header=header_row_pr)
 purchase = normalize(purchase)
 
 
-    gstin_pr = find_col(purchase.columns,"gstin") or find_col(purchase.columns,"gst")
+    gstin_pr = find_col(purchase.columns,"gstin/Uin") or find_col(purchase.columns,"gstin/Uin")
 
     party_pr = find_col(purchase.columns,"particular")
     invoice_pr = find_col(purchase.columns,"invoice")
@@ -178,7 +178,7 @@ purchase = normalize(purchase)
 
     dfpr = pd.DataFrame()
 
-    dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
+    dfpr["GSTIN/UIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
     dfpr["Party"] = purchase[party_pr]
     dfpr["Invoice"] = purchase[invoice_pr].apply(clean_invoice)
 
