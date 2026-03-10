@@ -11,18 +11,27 @@ gstr_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"])
 
 
-# -------------------------
-# Clean invoice number
-# A/123/23-24 → 123
-# -------------------------
-def clean_invoice(x):
+def clean_invoice(inv):
 
-    if pd.isna(x):
+    if pd.isna(inv):
         return ""
 
-    nums = re.findall(r"\d+", str(x))
+    inv = str(inv).upper()
 
-    return nums[0] if nums else ""
+    # pattern 26-274
+    m = re.search(r"\d{2}-\d+", inv)
+    if m:
+        return m.group()
+
+    # pattern S1804
+    m = re.search(r"[A-Z]\d{3,}", inv)
+    if m:
+        return m.group()
+
+    # fallback remove symbols
+    inv = re.sub(r"[^A-Z0-9]", "", inv)
+
+    return inv
 
 
 # -------------------------
