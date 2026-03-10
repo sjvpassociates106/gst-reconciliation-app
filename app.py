@@ -113,9 +113,9 @@ if gstr_file and purchase_file:
 
     df2b["Taxable2B"] = num(gstr2b[taxable_col])
 
-    igst_col = find_col(gstr2b.columns,"integrated")
-    cgst_col = find_col(gstr2b.columns,"central")
-    sgst_col = find_col(gstr2b.columns,"state")
+    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col in gstr2b.columns else 0
+    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col in gstr2b.columns else 0
+    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col in gstr2b.columns else 0
 
     # Remove duplicates
     df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).sum()
