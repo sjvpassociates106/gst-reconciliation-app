@@ -115,9 +115,9 @@ if gstr_file and purchase_file:
 
     df2b["Taxable2B"] = num(gstr2b[taxable_col])
 
-   igst_col = next((c for c in gstr2b.columns if "integrated tax" in c), None)
-   cgst_col = next((c for c in gstr2b.columns if "central tax" in c), None)
-   sgst_col = next((c for c in gstr2b.columns if "state tax" in c or "ut" in c), None)
+   igst_col = next((c for c in gstr2b.columns if "Integrated Tax(₹)" in c), None)
+   cgst_col = next((c for c in gstr2b.columns if "Central Tax(₹)" in c), None)
+   sgst_col = next((c for c in gstr2b.columns if "State/UT Tax(₹)" in c or "ut" in c), None)
 
 
     # Remove duplicate invoices from 2B
