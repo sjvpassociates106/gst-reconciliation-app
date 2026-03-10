@@ -116,6 +116,21 @@ if gstr_file and purchase_file:
 
     df2b["Taxable2B"] = num(gstr2b[taxable_col])
 
+igst_col = None
+cgst_col = None
+sgst_col = None
+
+for col in gstr2b.columns:
+
+    if "integrated" in col:
+        igst_col = col
+
+    elif "central" in col:
+        cgst_col = col
+
+    elif "state" in col or "ut" in col:
+        sgst_col = col
+        
     df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
     df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
     df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
