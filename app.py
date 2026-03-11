@@ -46,38 +46,27 @@ if gstr_file and purchase_file:
     gstr2b = pd.read_excel(gstr_file,sheet_name="B2B",header=header2b)
 
     # Detect columns
-    gstin_col=None
-    party_col=None
-    invoice_col=None
-    taxable_col=None
-    igst_col=None
-    cgst_col=None
-    sgst_col=None
-
+    
     for col in gstr2b.columns:
 
         c=str(col).lower().replace("₹","")
 
-        if "gstin" in c:
-            gstin_col=col
+        igst_col = None
+        cgst_col = None
+        sgst_col = None
 
-        if "trade" in c or "legal" in c:
-            party_col=col
+for col in gstr2b.columns:
 
-        if "invoice" in c:
-            invoice_col=col
+    name = str(col).lower()
 
-        if "taxable" in c:
-            taxable_col=col
+    if "integrated" in name or "igst" in name:
+        igst_col = col
 
-        if "integrated" in c:
-            igst_col=col
+    elif "central" in name or "cgst" in name:
+        cgst_col = col
 
-        if "central" in c:
-            cgst_col=col
-
-        if "state" in c or "ut" in c:
-            sgst_col=col
+    elif "state" in name or "ut" in name or "sgst" in name:
+        sgst_col = col
 
 
     df2b=pd.DataFrame()
