@@ -116,24 +116,11 @@ if gstr_file and purchase_file:
 
     df2b["Taxable2B"] = num(gstr2b[taxable_col])
 
-igst_col = None
-cgst_col = None
-sgst_col = None
 
-for col in gstr2b.columns:
-
-    if "integrated" in col:
-        igst_col = col
-
-    elif "central" in col:
-        cgst_col = col
-
-    elif "state" in col or "ut" in col:
-        sgst_col = col
         
    igst_col = find_col(gstr2b.columns, "integrated")
    cgst_col = find_col(gstr2b.columns, "central")
-sgst_col = find_col(gstr2b.columns, "state") or find_col(gstr2b.columns, "ut")
+   sgst_col = find_col(gstr2b.columns, "state") or find_col(gstr2b.columns, "ut")
 
     st.write("Detected columns:", gstr2b.columns)
 
