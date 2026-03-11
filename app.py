@@ -41,11 +41,14 @@ def num(series):
     )
    
 def detect_header(file, sheet):
+
     temp = pd.read_excel(file, sheet_name=sheet, header=None)
 
-    for i in range(15):
+    for i in range(20):
+
         row = " ".join(temp.iloc[i].astype(str).str.lower())
-        if "invoice" in row and "gst" in row:
+
+        if "gstin of supplier" in row:
             return i
 
     return 0
