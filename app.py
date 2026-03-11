@@ -110,8 +110,16 @@ if gstr_file and purchase_file:
 
 
     # Remove duplicate invoices
-    df2b=df2b.groupby(["GSTIN","Invoice"],as_index=False).sum()
-
+    df2b = (
+    df2b.groupby(["GSTIN","Invoice"], as_index=False)
+    .agg({
+        "Party":"first",
+        "Taxable2B":"sum",
+        "IGST2B":"sum",
+        "CGST2B":"sum",
+        "SGST2B":"sum"
+    })
+)
 
     # ----- Load Purchase Register -----
 
