@@ -11,12 +11,12 @@ gstr_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"])
 
 
-# ---------- Utility Functions ----------
+# ---------- Helper Functions ----------
 
 def clean_invoice(inv):
     if pd.isna(inv):
         return ""
-    nums = re.findall(r"\d{2,6}", str(inv))
+    nums = re.findall(r"\d{3,6}", str(inv))
     return nums[0] if nums else ""
 
 
@@ -29,12 +29,10 @@ def detect_header(file, sheet):
 
     for i in range(20):
         row = " ".join(temp.iloc[i].astype(str).str.lower())
-        if "invoice" in row and "gst":
+        if "invoice" in row and "gst" in row:
             return i
     return 0
 
-
-# ---------- Detect Columns ----------
 
 def detect_columns(df):
 
@@ -48,48 +46,37 @@ def detect_columns(df):
 
     for col in df.columns:
 
-        c=str(col).lower().replace("₹","").strip()
+        c=str(col).lower().replace("₹","")
 
-        if "gstin" in c or "uin" in c:
+        if "gstin" in c:
             gstin_col=col
 
-        elif ("party" in c or "supplier" in c or "vendor" in c
-              or "trade" in c or "legal" in c or "name" in c
-              or "particular" in c):
+        if "trade" in c or "legal" in c or "party" in c:
             party_col=col
 
-        elif "invoice" in c or "bill" in c:
+        if "invoice" in c:
             invoice_col=col
 
-        elif "taxable" in c:
+        if "taxable" in c:
             taxable_col=col
 
-        elif "integrated" in c or "igst" in c:
+        if "integrated" in c or "igst" in c:
             igst_col=col
 
-        elif "central" in c or "cgst" in c:
+        if "central" in c or "cgst" in c:
             cgst_col=col
 
-        elif "state" in c or "ut" in c or "sgst" in c:
+        if "state" in c or "ut" in c or "sgst" in c:
             sgst_col=col
-
-
-    # ---- fallback safety ----
-
-    if gstin_col is None:
-        gstin_col=df.columns[0]
-
-    if party_col is None:
-        party_col=df.columns[1]
 
     return gstin_col,party_col,invoice_col,taxable_col,igst_col,cgst_col,sgst_col
 
 
-# ---------- Main Process ----------
+# ---------- Main Processing ----------
 
 if gstr_file and purchase_file:
 
-    # ---------- GSTR-2B ----------
+    # ---------- Load GSTR2B ----------
 
     header2b=detect_header(gstr_file,"B2B")
 
@@ -110,11 +97,11 @@ if gstr_file and purchase_file:
     df2b["SGST2B"]=num(gstr2b[sgst_col]) if sgst_col else 0
 
 
-    # ---------- Remove Duplicate Invoices ----------
+    # ---------- Remove duplicate invoices ----------
     df2b=df2b.groupby(["GSTIN","Invoice"],as_index=False).sum()
 
 
-    # ---------- Purchase Register ----------
+    # ---------- Load Purchase Register ----------
 
     headerpr=detect_header(purchase_file,0)
 
@@ -136,7 +123,6 @@ if gstr_file and purchase_file:
 
 
     # ---------- Merge ----------
-
     recon=pd.merge(
         dfpr,
         df2b,
@@ -182,8 +168,7 @@ if gstr_file and purchase_file:
     recon=recon.drop(columns=["_merge"])
 
 
-    # ---------- Display Result ----------
-
+    # ---------- Show Result ----------
     st.subheader("Reconciliation Result")
 
     st.dataframe(recon,use_container_width=True)
