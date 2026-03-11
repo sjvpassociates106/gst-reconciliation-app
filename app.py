@@ -122,7 +122,12 @@ if gstr_file and purchase_file:
    cgst_col = find_col(gstr2b.columns, "central")
    sgst_col = find_col(gstr2b.columns, "state") or find_col(gstr2b.columns, "ut")
 
-    st.write("Detected columns:", gstr2b.columns)
+
+   df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
+   df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
+   df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
+   
+   st.write("Detected columns:", gstr2b.columns)
 
     # Remove duplicates
     df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).sum()
