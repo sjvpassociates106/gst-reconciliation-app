@@ -153,32 +153,39 @@ if gstr_file and purchase_file:
     cgst_pr=None
     sgst_pr=None
 
-    for col in purchase.columns:
+for col in purchase.columns:
 
-        c=str(col).lower()
+    c=str(col).lower()
 
-        if "gstin" in c:
-            gstin_pr=col
+    if "gstin" in c or "supplier gst" in c:
+        gstin_pr=col
 
-        elif "party" in c or "particular" in c:
-            party_pr=col
+    elif "party" in c or "particular" in c or "supplier" in c:
+        party_pr=col
 
-        elif "invoice" in c:
-            invoice_pr=col
+    elif "invoice" in c or "bill" in c:
+        invoice_pr=col
 
-        elif "taxable" in c:
-            taxable_pr=col
+    elif "taxable" in c:
+        taxable_pr=col
 
-        elif "igst" in c:
-            igst_pr=col
+    elif "igst" in c:
+        igst_pr=col
 
-        elif "cgst" in c:
-            cgst_pr=col
+    elif "cgst" in c:
+        cgst_pr=col
 
-        elif "sgst" in c:
-            sgst_pr=col
+    elif "sgst" in c:
+        sgst_pr=col
 
+if gstin_pr is None:
+    st.error("GSTIN column not found in Purchase Register")
+    st.stop()
 
+if invoice_pr is None:
+    st.error("Invoice column not found in Purchase Register")
+    st.stop()
+    
     dfpr=pd.DataFrame()
 
     dfpr["GSTIN"]=purchase[gstin_pr].astype(str).str.upper().str.strip()
