@@ -135,6 +135,7 @@ for col in gstr2b.columns:
     df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
     df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
 
+    st.write("Detected columns:", gstr2b.columns)
 
     # Remove duplicates
     df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).sum()
