@@ -79,7 +79,6 @@ if gstr_file and purchase_file:
         if "state" in c or "ut" in c:
             sgst_col=col
 
-     return gstin_col,party_col,invoice_col,taxable_col,igst_col,cgst_col,sgst_col
 
     df2b=pd.DataFrame()
 
