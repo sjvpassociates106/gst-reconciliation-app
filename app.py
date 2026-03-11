@@ -77,8 +77,26 @@ if gstr_file and purchase_file:
     df2b["GSTIN"] = gstr2b[gstin_col].astype(str).str.upper().str.strip()
     df2b["Party"] = gstr2b[party_col]
     df2b["Invoice"] = gstr2b[invoice_col].apply(clean_invoice)
-
     df2b["Taxable2B"] = num(gstr2b[taxable_col])
+  
+# Detect tax columns from GSTR-2B B2B sheet
+   igst_col = None
+   cgst_col = None
+   sgst_col = None
+
+for col in gstr2b.columns:
+
+    col_clean = str(col).lower().replace("₹","")
+
+    if "integrated" in col_clean:
+        igst_col = col
+
+    if "central" in col_clean:
+        cgst_col = col
+
+    if "state" in col_clean or "ut" in col_clean:
+        sgst_col = col
+    
     df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
     df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
     df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
