@@ -232,8 +232,10 @@ if gstr_file and purchase_file:
 
     recon.to_excel(buffer, index=False)
 
-    st.download_button(
-        "Download Excel Report",
-        buffer.getvalue(),
-        "GST_Reconciliation_Output.xlsx"
-    )
+ st.download_button(
+    label="Download Excel Report",
+    data=buffer.getvalue(),
+    file_name="GST_Reconciliation_Output.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    key="download_excel"
+)
