@@ -42,15 +42,19 @@ def num(series):
    
 def detect_header(file, sheet):
 
+    # Read sheet without header
     temp = pd.read_excel(file, sheet_name=sheet, header=None)
 
-    for i in range(20):
+    # Scan first 15 rows to find header
+    for i in range(15):
 
         row = " ".join(temp.iloc[i].astype(str).str.lower())
 
-        if "gstin of supplier" in row:
+        # Check if header row contains these keywords
+        if "invoice" in row and "gst" in row:
             return i
 
+    # Default header row
     return 0
 
 
