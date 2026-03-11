@@ -65,7 +65,7 @@ if gstr_file and purchase_file:
 
     for col in gstr2b.columns:
 
-        c=str(col).lower().replace("₹","")
+        c=str(col).lower().replace("₹","").replace("(₹)","")
 
         if "gstin" in c:
             gstin_col=col
