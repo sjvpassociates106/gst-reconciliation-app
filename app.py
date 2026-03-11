@@ -131,9 +131,9 @@ for col in gstr2b.columns:
     elif "state" in col or "ut" in col:
         sgst_col = col
         
-    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
-    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
-    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
+   igst_col = find_col(gstr2b.columns, "integrated")
+   cgst_col = find_col(gstr2b.columns, "central")
+sgst_col = find_col(gstr2b.columns, "state") or find_col(gstr2b.columns, "ut")
 
     st.write("Detected columns:", gstr2b.columns)
 
