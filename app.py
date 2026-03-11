@@ -190,8 +190,7 @@ if invoice_pr is None:
 
     if gstin_pr:
     dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
-else:
-    dfpr["GSTIN"] = "UNKNOWN"
+    else:dfpr["GSTIN"] = "UNKNOWN"
     dfpr["Party"]=purchase[party_pr]
     dfpr["Invoice"]=purchase[invoice_pr].apply(clean_invoice)
 
