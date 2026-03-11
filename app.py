@@ -95,13 +95,6 @@ if gstr_file and purchase_file:
         if "state" in c or "ut" in c:
             sgst_col=col
 
-    st.write("Detected columns:")
-    st.write("GSTIN:", gstin_col)
-    st.write("Invoice:", invoice_col)
-    st.write("Taxable:", taxable_col)
-    st.write("IGST:", igst_col)
-    st.write("CGST:", cgst_col)
-    st.write("SGST:", sgst_col)
 
     df2b=pd.DataFrame()
 
