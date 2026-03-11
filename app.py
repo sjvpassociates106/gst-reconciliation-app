@@ -98,9 +98,9 @@ for col in gstr2b.columns:
     if "state" in col_clean or "ut" in col_clean:
         sgst_col = col
 
-   df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
-   df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
-   df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
+    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
+    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
+    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
 
     # Remove duplicates
     df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).sum()
