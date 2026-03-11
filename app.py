@@ -14,10 +14,19 @@ purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"]
 # -------- Functions --------
 
 def clean_invoice(inv):
+
     if pd.isna(inv):
         return ""
-    nums = re.findall(r"\d{3,5}", str(inv))
-    return nums[0] if nums else ""
+
+    inv = str(inv).upper()
+
+    # remove symbols
+    inv = re.sub(r"[^A-Z0-9]", "", inv)
+
+    # remove years
+    inv = re.sub(r"20[2-3][0-9]", "", inv)
+
+    return inv[-6:]
 
 
 def num(series):
