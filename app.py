@@ -188,7 +188,10 @@ if invoice_pr is None:
     
     dfpr=pd.DataFrame()
 
-    dfpr["GSTIN"]=purchase[gstin_pr].astype(str).str.upper().str.strip()
+    if gstin_pr:
+    dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
+else:
+    dfpr["GSTIN"] = "UNKNOWN"
     dfpr["Party"]=purchase[party_pr]
     dfpr["Invoice"]=purchase[invoice_pr].apply(clean_invoice)
 
@@ -201,12 +204,9 @@ if invoice_pr is None:
     # -------- Merge --------
 
     recon=pd.merge(
-        dfpr,
-        df2b,
-        on=["GSTIN","Invoice"],
-        how="outer",
-        indicator=True
-    )
+    dfpr,
+    df2b,
+    on=["Invoice"],
 
 
     # -------- Reconciliation --------
