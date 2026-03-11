@@ -30,9 +30,16 @@ def clean_invoice(inv):
 
 
 def num(series):
-    return pd.to_numeric(series, errors="coerce").fillna(0)
 
-
+    return (
+        series.astype(str)
+        .str.replace("₹","",regex=False)
+        .str.replace(",","",regex=False)
+        .str.strip()
+        .replace("",0)
+        .astype(float)
+    )
+   
 def detect_header(file, sheet):
     temp = pd.read_excel(file, sheet_name=sheet, header=None)
 
