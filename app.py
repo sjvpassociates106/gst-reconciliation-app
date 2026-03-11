@@ -113,8 +113,7 @@ if gstr_file and purchase_file:
 
     dfpr["GSTIN"]=purchase[gstin_col].astype(str).str.upper().str.strip()
     if party_col is None:
-    party_col = df.columns[1] 
-    if "trade" in c or "legal" in c or "party" in c or "supplier" in c or "vendor" in c or "name" in c or "particular" in c:
+    party_col = df.columns[1] "trade" in c or "legal" in c or "party" in c or "supplier" in c or "vendor" in c or "name" in c or "particular" in c:
     party_col = col
     dfpr["Invoice"]=purchase[invoice_col].apply(clean_invoice)
 
