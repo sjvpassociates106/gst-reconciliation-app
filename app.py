@@ -72,32 +72,36 @@ def detect_columns(df):
 
     for col in df.columns:
 
-        c=str(col).lower().replace("₹","")
+        c=str(col).lower()
 
         if "gstin" in c:
             gstin=col
 
-        elif "particular" in c or "party" in c or "supplier" in c or "trade" in c:
+        elif "particular" in c or "party" in c or "supplier" in c:
             party=col
 
-        elif "invoice" in c:
+        elif ("invoice" in c 
+              or "inv" in c 
+              or "bill" in c):
             invoice=col
 
         elif "taxable" in c:
             taxable=col
 
-        elif "integrated" in c or "igst" in c:
+        elif "igst" in c or "integrated" in c:
             igst=col
 
-        elif "central" in c or "cgst" in c:
+        elif "cgst" in c or "central" in c:
             cgst=col
 
-        elif "state" in c or "sgst" in c:
+        elif "sgst" in c or "state" in c:
             sgst=col
 
+    # fallback protection
+    if invoice is None:
+        invoice = df.columns[4]
 
     return gstin,party,invoice,taxable,igst,cgst,sgst
-
 
 # -------------------------
 # MAIN PROCESS
