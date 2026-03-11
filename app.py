@@ -112,7 +112,7 @@ if gstr_file and purchase_file:
     dfpr=pd.DataFrame()
 
     dfpr["GSTIN"]=purchase[gstin_col].astype(str).str.upper().str.strip()
-    dfpr["Party"]=purchase[party_col]
+    dfpr["Party"]=purchase[particular_col]
     dfpr["Invoice"]=purchase[invoice_col].apply(clean_invoice)
 
     dfpr["TaxablePR"]=num(purchase[taxable_col])
