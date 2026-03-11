@@ -77,12 +77,12 @@ def detect_columns(df):
         if "gstin" in c:
             gstin=col
 
-        elif "particular" in c or "party" in c or "supplier" in c:
+        elif ("trade" in c or "legal" in c or "party" in c
+              or "supplier" in c or "vendor" in c
+              or "particular" in c or "name" in c):
             party=col
 
-        elif ("invoice" in c 
-              or "inv" in c 
-              or "bill" in c):
+        elif ("invoice" in c or "inv" in c):
             invoice=col
 
         elif "taxable" in c:
@@ -97,9 +97,9 @@ def detect_columns(df):
         elif "sgst" in c or "state" in c:
             sgst=col
 
-    # fallback protection
-    if invoice is None:
-        invoice = df.columns[4]
+
+    if party is None:
+        party = df.columns[1]
 
     return gstin,party,invoice,taxable,igst,cgst,sgst
 
