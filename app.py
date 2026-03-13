@@ -2,9 +2,8 @@ import streamlit as st
 import pandas as pd
 import re
 from io import BytesIO
-from rapidfuzz import process
 
-st.set_page_config(page_title="GST Reconciliation Tool", layout="wide")
+st.set_page_config(page_title="GST Reconciliation", layout="wide")
 
 st.title("GST 2B vs Purchase Register Reconciliation")
 
@@ -12,18 +11,16 @@ gstr_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"])
 
 
-# ---------------- FUNCTIONS ----------------
+# ---------- FUNCTIONS ----------
 
 def clean_invoice(inv):
 
     if pd.isna(inv):
         return ""
 
-    inv = str(inv).upper().strip()
+    inv = str(inv).upper()
 
     inv = re.sub(r"[^A-Z0-9]", "", inv)
-
-    inv = re.sub(r"20[0-9]{2}", "", inv)
 
     nums = re.findall(r"\d+", inv)
 
@@ -39,7 +36,6 @@ def num(series):
         series.astype(str)
         .str.replace("₹","",regex=False)
         .str.replace(",","",regex=False)
-        .str.strip()
         .replace("",0)
         .astype(float)
     )
@@ -59,24 +55,12 @@ def detect_header(file):
     return 0
 
 
-def fuzzy_match(invoice, invoice_list):
-
-    if invoice in invoice_list:
-        return invoice
-
-    match = process.extractOne(invoice, invoice_list, score_cutoff=90)
-
-    if match:
-        return match[0]
-
-    return invoice
-
-
-# ---------------- PROCESS ----------------
+# ---------- PROCESS ----------
 
 if gstr_file and purchase_file:
 
-    # -------- LOAD GSTR 2B --------
+
+    # ---------- LOAD GSTR2B ----------
 
     gstr = pd.read_excel(gstr_file, sheet_name="B2B")
 
@@ -87,6 +71,7 @@ if gstr_file and purchase_file:
     igst_col=None
     cgst_col=None
     sgst_col=None
+
 
     for col in gstr.columns:
 
@@ -129,11 +114,13 @@ if gstr_file and purchase_file:
     df2b=df2b.dropna(subset=["Invoice"])
 
 
-    # -------- LOAD PURCHASE REGISTER --------
 
-    header=detect_header(purchase_file)
+    # ---------- LOAD PURCHASE REGISTER ----------
 
-    purchase=pd.read_excel(purchase_file,header=header)
+    header = detect_header(purchase_file)
+
+    purchase = pd.read_excel(purchase_file, header=header)
+
 
     gstin_pr=None
     party_pr=None
@@ -142,6 +129,7 @@ if gstr_file and purchase_file:
     igst_pr=None
     cgst_pr=None
     sgst_pr=None
+
 
     for col in purchase.columns:
 
@@ -171,21 +159,17 @@ if gstr_file and purchase_file:
 
     dfpr=pd.DataFrame()
 
-    if gstin_pr:
-        dfpr["GSTIN"]=purchase[gstin_pr]
-    else:
-        dfpr["GSTIN"]="UNKNOWN"
+    dfpr["GSTIN"]=purchase[gstin_pr] if gstin_pr else "UNKNOWN"
 
-    if party_pr:
-        dfpr["Party"]=purchase[party_pr]
-    else:
-        dfpr["Party"]="UNKNOWN"
+    dfpr["Party"]=purchase[party_pr] if party_pr else "UNKNOWN"
 
     if invoice_pr:
         dfpr["Invoice"]=purchase[invoice_pr].apply(clean_invoice)
     else:
-        st.error("Invoice column not found")
+        st.error("Invoice column not found in Purchase Register")
+        st.write("Columns:",purchase.columns)
         st.stop()
+
 
     dfpr["TaxablePR"]=num(purchase[taxable_pr]) if taxable_pr else 0
     dfpr["IGSTPR"]=num(purchase[igst_pr]) if igst_pr else 0
@@ -195,14 +179,8 @@ if gstr_file and purchase_file:
     dfpr=dfpr.dropna(subset=["Invoice"])
 
 
-    # -------- AI MATCH --------
 
-    invoice_list=df2b["Invoice"].tolist()
-
-    dfpr["Invoice"]=dfpr["Invoice"].apply(lambda x:fuzzy_match(x,invoice_list))
-
-
-    # -------- MERGE --------
+    # ---------- MERGE ----------
 
     recon=dfpr.merge(df2b,on="Invoice",how="outer",indicator=True)
 
@@ -213,24 +191,29 @@ if gstr_file and purchase_file:
     recon.loc[recon["_merge"]=="right_only","Status"]="Missing in Purchase"
 
 
-    # -------- DASHBOARD --------
 
-    st.subheader("Summary")
+    # ---------- SUMMARY ----------
+
+    st.subheader("Reconciliation Summary")
 
     c1,c2,c3,c4=st.columns(4)
 
     c1.metric("Total",len(recon))
     c2.metric("Matched",len(recon[recon["Status"]=="Matched"]))
-    c3.metric("Missing 2B",len(recon[recon["Status"]=="Missing in 2B"]))
-    c4.metric("Missing Purchase",len(recon[recon["Status"]=="Missing in Purchase"]))
+    c3.metric("Missing in 2B",len(recon[recon["Status"]=="Missing in 2B"]))
+    c4.metric("Missing in Purchase",len(recon[recon["Status"]=="Missing in Purchase"]))
 
 
-    st.subheader("Reconciliation Result")
+
+    # ---------- DISPLAY RESULT ----------
+
+    st.subheader("Reconciliation Output")
 
     st.dataframe(recon,use_container_width=True)
 
 
-    # -------- EXPORT --------
+
+    # ---------- EXPORT REPORT ----------
 
     buffer=BytesIO()
 
