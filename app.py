@@ -11,7 +11,7 @@ gstr_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"])
 
 
-# ---------------- Functions ----------------
+# ---------------- FUNCTIONS ----------------
 
 def clean_invoice(inv):
 
@@ -53,11 +53,11 @@ def detect_header(file, sheet):
     return 0
 
 
-# ---------------- Process ----------------
+# ---------------- PROCESS ----------------
 
 if gstr_file and purchase_file:
 
-    # -------- Load GSTR-2B --------
+    # ---------- LOAD GSTR2B ----------
 
     header2b = detect_header(gstr_file,"B2B")
 
@@ -71,52 +71,53 @@ if gstr_file and purchase_file:
 
     gstr2b.columns = gstr2b.columns.str.replace("₹","")
 
-    # Detect columns
-    gstin_col = None
-    party_col = None
-    invoice_col = None
-    taxable_col = None
-    igst_col = None
-    cgst_col = None
-    sgst_col = None
+
+    gstin_col=None
+    party_col=None
+    invoice_col=None
+    taxable_col=None
+    igst_col=None
+    cgst_col=None
+    sgst_col=None
+
 
     for col in gstr2b.columns:
 
-        c = str(col).lower()
+        c=str(col).lower()
 
         if "gstin" in c:
-            gstin_col = col
+            gstin_col=col
 
         elif "trade" in c or "legal" in c:
-            party_col = col
+            party_col=col
 
         elif "invoice" in c:
-            invoice_col = col
+            invoice_col=col
 
         elif "taxable" in c:
-            taxable_col = col
+            taxable_col=col
 
         elif "integrated" in c or "igst" in c:
-            igst_col = col
+            igst_col=col
 
         elif "central" in c or "cgst" in c:
-            cgst_col = col
+            cgst_col=col
 
         elif "state" in c or "sgst" in c:
-            sgst_col = col
+            sgst_col=col
 
 
-    df2b = pd.DataFrame()
+    df2b=pd.DataFrame()
 
-    df2b["GSTIN"] = gstr2b[gstin_col].astype(str).str.upper().str.strip()
-    df2b["Party"] = gstr2b[party_col]
-    df2b["Invoice"] = gstr2b[invoice_col].apply(clean_invoice)
+    df2b["GSTIN"]=gstr2b[gstin_col].astype(str).str.upper().str.strip()
+    df2b["Party"]=gstr2b[party_col]
+    df2b["Invoice"]=gstr2b[invoice_col].apply(clean_invoice)
 
-    df2b["Taxable2B"] = num(gstr2b[taxable_col])
+    df2b["Taxable2B"]=num(gstr2b[taxable_col])
 
-    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
-    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
-    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
+    df2b["IGST2B"]=num(gstr2b[igst_col]) if igst_col else 0
+    df2b["CGST2B"]=num(gstr2b[cgst_col]) if cgst_col else 0
+    df2b["SGST2B"]=num(gstr2b[sgst_col]) if sgst_col else 0
 
 
     df2b = (
@@ -131,79 +132,81 @@ if gstr_file and purchase_file:
     )
 
 
-    # ----- Load Purchase Register -----
+    # ---------- LOAD PURCHASE REGISTER ----------
 
-headerpr = detect_header(purchase_file,0)
-
-purchase = pd.read_excel(purchase_file, header=headerpr)
-
-# Detect columns
-gstin_pr = None
-party_pr = None
-invoice_pr = None
-taxable_pr = None
-igst_pr = None
-cgst_pr = None
-sgst_pr = None
-
-for col in purchase.columns:
-
-    c = str(col).lower()
-
-    if "gstin" in c or "uin" in c:
-        gstin_pr = col
-
-    elif "party" in c or "supplier" in c or "vendor" in c or "ledger" in c:
-        party_pr = col
-
-    elif "invoice" in c or "bill" in c or "voucher" in c:
-        invoice_pr = col
-
-    elif "taxable" in c:
-        taxable_pr = col
-
-    elif "igst" in c:
-        igst_pr = col
-
-    elif "cgst" in c:
-        cgst_pr = col
-
-    elif "sgst" in c:
-        sgst_pr = col
+    purchase = pd.read_excel(purchase_file)
 
 
-dfpr = pd.DataFrame()
-
-# GSTIN (optional)
-if gstin_pr and gstin_pr in purchase.columns:
-    dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
-else:
-    dfpr["GSTIN"] = "UNKNOWN"
-
-# Party (optional)
-if party_pr and party_pr in purchase.columns:
-    dfpr["Party"] = purchase[party_pr]
-else:
-    dfpr["Party"] = "UNKNOWN"
-
-# Invoice (mandatory)
-if invoice_pr is not None and invoice_pr in purchase.columns:
-    dfpr["Invoice"] = purchase[invoice_pr].apply(clean_invoice)
-else:
-    st.error("Invoice column not found in Purchase Register")
-    st.write("Available columns:", purchase.columns)
-    st.stop()
-
-# Tax values
-dfpr["TaxablePR"] = num(purchase[taxable_pr]) if taxable_pr else 0
-dfpr["IGSTPR"] = num(purchase[igst_pr]) if igst_pr else 0
-dfpr["CGSTPR"] = num(purchase[cgst_pr]) if cgst_pr else 0
-dfpr["SGSTPR"] = num(purchase[sgst_pr]) if sgst_pr else 0
+    gstin_pr=None
+    party_pr=None
+    invoice_pr=None
+    taxable_pr=None
+    igst_pr=None
+    cgst_pr=None
+    sgst_pr=None
 
 
-    # -------- Merge --------
+    for col in purchase.columns:
 
-    recon = pd.merge(
+        c=str(col).lower()
+
+        if "gstin" in c:
+            gstin_pr=col
+
+        elif "party" in c or "vendor" in c or "supplier" in c or "ledger" in c:
+            party_pr=col
+
+        elif "invoice" in c or "bill" in c or "voucher" in c:
+            invoice_pr=col
+
+        elif "taxable" in c:
+            taxable_pr=col
+
+        elif "igst" in c:
+            igst_pr=col
+
+        elif "cgst" in c:
+            cgst_pr=col
+
+        elif "sgst" in c:
+            sgst_pr=col
+
+
+    dfpr=pd.DataFrame()
+
+
+    # GSTIN optional
+    if gstin_pr and gstin_pr in purchase.columns:
+        dfpr["GSTIN"]=purchase[gstin_pr].astype(str).str.upper().str.strip()
+    else:
+        dfpr["GSTIN"]="UNKNOWN"
+
+
+    # Party optional
+    if party_pr and party_pr in purchase.columns:
+        dfpr["Party"]=purchase[party_pr]
+    else:
+        dfpr["Party"]="UNKNOWN"
+
+
+    # Invoice mandatory
+    if invoice_pr and invoice_pr in purchase.columns:
+        dfpr["Invoice"]=purchase[invoice_pr].apply(clean_invoice)
+    else:
+        st.error("Invoice column not found in Purchase Register")
+        st.write("Columns available:", purchase.columns)
+        st.stop()
+
+
+    dfpr["TaxablePR"]=num(purchase[taxable_pr]) if taxable_pr else 0
+    dfpr["IGSTPR"]=num(purchase[igst_pr]) if igst_pr else 0
+    dfpr["CGSTPR"]=num(purchase[cgst_pr]) if cgst_pr else 0
+    dfpr["SGSTPR"]=num(purchase[sgst_pr]) if sgst_pr else 0
+
+
+    # ---------- MERGE ----------
+
+    recon=pd.merge(
         dfpr,
         df2b,
         on=["Invoice"],
@@ -212,56 +215,43 @@ dfpr["SGSTPR"] = num(purchase[sgst_pr]) if sgst_pr else 0
     )
 
 
-    # -------- Reconciliation --------
+    # ---------- STATUS ----------
 
-    def check(r):
+    tol=2
 
-        if r["_merge"] == "left_only":
-            return pd.Series(["Mismatch","Missing in 2B"])
+    recon["Status"]="Matched"
 
-        if r["_merge"] == "right_only":
-            return pd.Series(["Mismatch","Missing in Purchase"])
+    recon.loc[recon["_merge"]=="left_only","Status"]="Missing in 2B"
+    recon.loc[recon["_merge"]=="right_only","Status"]="Missing in Purchase"
 
-        tol = 2
-        reasons = []
-
-        if abs(r["TaxablePR"] - r["Taxable2B"]) > tol:
-            reasons.append("Taxable mismatch")
-
-        if abs(r["IGSTPR"] - r["IGST2B"]) > tol:
-            reasons.append("IGST mismatch")
-
-        if abs(r["CGSTPR"] - r["CGST2B"]) > tol:
-            reasons.append("CGST mismatch")
-
-        if abs(r["SGSTPR"] - r["SGST2B"]) > tol:
-            reasons.append("SGST mismatch")
-
-        if len(reasons) == 0:
-            return pd.Series(["Matched",""])
-
-        return pd.Series(["Mismatch",",".join(reasons)])
+    recon["Tax Diff"]=recon["TaxablePR"]-recon["Taxable2B"]
 
 
-    recon[["Status","Reason"]] = recon.apply(check, axis=1)
-
-    recon = recon.drop(columns=["_merge"])
+    matched = recon[recon["Status"]=="Matched"]
+    missing2b = recon[recon["Status"]=="Missing in 2B"]
+    missingpr = recon[recon["Status"]=="Missing in Purchase"]
+    taxdiff = recon[abs(recon["Tax Diff"])>tol]
 
 
     st.subheader("Reconciliation Result")
+    st.dataframe(recon,use_container_width=True)
 
-    st.dataframe(recon, use_container_width=True)
 
-
-    # -------- Excel Download --------
+    # ---------- EXPORT ----------
 
     buffer = BytesIO()
 
-    recon.to_excel(buffer, index=False)
+    with pd.ExcelWriter(buffer) as writer:
+
+        matched.to_excel(writer,"Matched",index=False)
+        missing2b.to_excel(writer,"Missing in 2B",index=False)
+        missingpr.to_excel(writer,"Missing in Purchase",index=False)
+        taxdiff.to_excel(writer,"Tax Difference",index=False)
+
 
     st.download_button(
-        label="Download Excel Report",
+        label="Download Full Reconciliation Report",
         data=buffer.getvalue(),
-        file_name="GST_Reconciliation_Output.xlsx",
+        file_name="GST_Reconciliation_Report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
