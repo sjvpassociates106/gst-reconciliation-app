@@ -187,7 +187,7 @@ else:
     dfpr["Party"] = "UNKNOWN"
 
 # Invoice (mandatory)
-if invoice_pr and invoice_pr in purchase.columns:
+if invoice_pr is not None and invoice_pr in purchase.columns:
     dfpr["Invoice"] = purchase[invoice_pr].apply(clean_invoice)
 else:
     st.error("Invoice column not found in Purchase Register")
