@@ -61,9 +61,9 @@ def find_column(columns, keywords):
 
         c = str(col).lower()
 
-        for key in keywords:
+        for k in keywords:
 
-            if key in c:
+            if k in c:
                 return col
 
     return None
@@ -76,7 +76,22 @@ if gstr_file and purchase_file:
 
     # -------- LOAD GSTR2B --------
 
-    gstr = pd.read_excel(gstr_file, sheet_name="B2B")
+    raw = pd.read_excel(gstr_file, sheet_name="B2B", header=None)
+
+    header_row = 0
+
+    for i in range(20):
+
+        row = " ".join(raw.iloc[i].astype(str).str.lower())
+
+        if "invoice" in row and "gstin" in row:
+            header_row = i
+            break
+
+    gstr = pd.read_excel(gstr_file, sheet_name="B2B", header=header_row)
+
+    gstr.columns = gstr.columns.astype(str).str.replace("₹","")
+
 
     gstin_col = find_column(gstr.columns,["gstin"])
     party_col = find_column(gstr.columns,["trade","legal"])
@@ -95,7 +110,7 @@ if gstr_file and purchase_file:
 
     df2b = pd.DataFrame()
 
-    df2b["GSTIN"] = gstr[gstin_col].astype(str) if gstin_col else "UNKNOWN"
+    df2b["GSTIN"] = gstr[gstin_col] if gstin_col else "UNKNOWN"
     df2b["Party"] = gstr[party_col] if party_col else "UNKNOWN"
     df2b["Invoice"] = gstr[invoice_col].apply(clean_invoice)
 
@@ -113,6 +128,8 @@ if gstr_file and purchase_file:
     header = detect_header(purchase_file)
 
     purchase = pd.read_excel(purchase_file, header=header)
+
+    purchase.columns = purchase.columns.astype(str).str.replace("₹","")
 
 
     gstin_pr = find_column(purchase.columns,["gstin"])
@@ -152,12 +169,11 @@ if gstr_file and purchase_file:
     recon["Status"] = "Matched"
 
     recon.loc[recon["_merge"]=="left_only","Status"] = "Missing in 2B"
-
     recon.loc[recon["_merge"]=="right_only","Status"] = "Missing in Purchase"
 
 
 
-    # -------- DASHBOARD --------
+    # -------- SUMMARY --------
 
     st.subheader("Reconciliation Summary")
 
@@ -170,7 +186,7 @@ if gstr_file and purchase_file:
 
 
 
-    # -------- RESULT --------
+    # -------- DISPLAY RESULT --------
 
     st.subheader("Reconciliation Output")
 
@@ -178,7 +194,7 @@ if gstr_file and purchase_file:
 
 
 
-    # -------- EXPORT --------
+    # -------- EXPORT REPORT --------
 
     buffer = BytesIO()
 
