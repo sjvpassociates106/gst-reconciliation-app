@@ -171,8 +171,8 @@ if gstr_file and purchase_file:
 
     dfpr = pd.DataFrame()
 
-    if gstin_pr:
-        dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
+   
+    dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
     dfpr["Party"] = purchase[party_pr] "
     dfpr["Invoice"] = purchase[invoice_pr].apply(clean_invoice)
 
