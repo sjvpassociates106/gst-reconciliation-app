@@ -20,11 +20,22 @@ def clean_invoice(inv):
 
     inv = str(inv).upper()
 
+    # remove spaces
+    inv = inv.replace(" ", "")
+
+    # remove special characters
     inv = re.sub(r"[^A-Z0-9]", "", inv)
 
+    # remove year patterns
     inv = re.sub(r"20[0-9]{2}", "", inv)
 
-    return inv[-6:]
+    # extract numeric portion
+    numbers = re.findall(r"\d+", inv)
+
+    if numbers:
+        return numbers[-1]
+
+    return inv
 
 
 def num(series):
