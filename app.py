@@ -55,7 +55,17 @@ if gstr_file and purchase_file:
 
     header2b = detect_header(gstr_file, "B2B")
 
-    gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header2b)
+    gstr2b = pd.read_excel(
+    gstr_file,
+    sheet_name="B2B",
+    header=[header2b, header2b+1]
+)
+
+# flatten multi headers
+gstr2b.columns = [' '.join([str(i) for i in col]).strip() for col in gstr2b.columns]
+
+# remove ₹ symbol
+gstr2b.columns = gstr2b.columns.str.replace("₹","")
 
     # Detect columns
     gstin_col = None
@@ -82,13 +92,13 @@ if gstr_file and purchase_file:
         if "taxable" in c:
             taxable_col = col
 
-        if "integrated" in c:
+        if "integrated tax" in c or "igst" in c:
             igst_col = col
 
-        if "central" in c:
+        if "central tax" in c or "cgst" in c:
             cgst_col = col
 
-        if "state" in c or "ut" in c:
+        if "state" in c or "sgst" in c:
             sgst_col = col
 
 
