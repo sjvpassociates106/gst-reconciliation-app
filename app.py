@@ -131,55 +131,74 @@ if gstr_file and purchase_file:
     )
 
 
-    # -------- Load Purchase Register --------
+    # ----- Load Purchase Register -----
 
-    purchase = pd.read_excel(purchase_file)
+headerpr = detect_header(purchase_file,0)
 
-    gstin_pr = None
-    party_pr = None
-    invoice_pr = None
-    taxable_pr = None
-    igst_pr = None
-    cgst_pr = None
-    sgst_pr = None
+purchase = pd.read_excel(purchase_file, header=headerpr)
 
-    for col in purchase.columns:
+# Detect columns
+gstin_pr = None
+party_pr = None
+invoice_pr = None
+taxable_pr = None
+igst_pr = None
+cgst_pr = None
+sgst_pr = None
 
-        c = str(col).lower()
+for col in purchase.columns:
 
-        if "gstin" in c:
-            gstin_pr = col
+    c = str(col).lower()
 
-        elif "party" in c or "vendor" in c or "supplier" in c:
-            party_pr = col
+    if "gstin" in c or "uin" in c:
+        gstin_pr = col
 
-        elif "invoice" in c or "bill" in c:
-            invoice_pr = col
+    elif "party" in c or "supplier" in c or "vendor" in c or "ledger" in c:
+        party_pr = col
 
-        elif "taxable" in c:
-            taxable_pr = col
+    elif "invoice" in c or "bill" in c or "voucher" in c:
+        invoice_pr = col
 
-        elif "igst" in c:
-            igst_pr = col
+    elif "taxable" in c:
+        taxable_pr = col
 
-        elif "cgst" in c:
-            cgst_pr = col
+    elif "igst" in c:
+        igst_pr = col
 
-        elif "sgst" in c:
-            sgst_pr = col
+    elif "cgst" in c:
+        cgst_pr = col
+
+    elif "sgst" in c:
+        sgst_pr = col
 
 
-    dfpr = pd.DataFrame()
-    
+dfpr = pd.DataFrame()
+
+# GSTIN (optional)
+if gstin_pr and gstin_pr in purchase.columns:
     dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
-    dfpr["Party"] = purchase[party_pr] 
+else:
+    dfpr["GSTIN"] = "UNKNOWN"
+
+# Party (optional)
+if party_pr and party_pr in purchase.columns:
+    dfpr["Party"] = purchase[party_pr]
+else:
+    dfpr["Party"] = "UNKNOWN"
+
+# Invoice (mandatory)
+if invoice_pr and invoice_pr in purchase.columns:
     dfpr["Invoice"] = purchase[invoice_pr].apply(clean_invoice)
+else:
+    st.error("Invoice column not found in Purchase Register")
+    st.write("Available columns:", purchase.columns)
+    st.stop()
 
-    dfpr["TaxablePR"] = num(purchase[taxable_pr]) 
-
-    dfpr["IGSTPR"] = num(purchase[igst_pr]) if igst_pr else 0
-    dfpr["CGSTPR"] = num(purchase[cgst_pr]) if cgst_pr else 0
-    dfpr["SGSTPR"] = num(purchase[sgst_pr]) if sgst_pr else 0
+# Tax values
+dfpr["TaxablePR"] = num(purchase[taxable_pr]) if taxable_pr else 0
+dfpr["IGSTPR"] = num(purchase[igst_pr]) if igst_pr else 0
+dfpr["CGSTPR"] = num(purchase[cgst_pr]) if cgst_pr else 0
+dfpr["SGSTPR"] = num(purchase[sgst_pr]) if sgst_pr else 0
 
 
     # -------- Merge --------
