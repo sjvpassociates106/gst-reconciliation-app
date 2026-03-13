@@ -173,11 +173,7 @@ if gstr_file and purchase_file:
 
     if gstin_pr:
         dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
-    else:
-        dfpr["GSTIN"] = "UNKNOWN"
-
-    dfpr["Party"] = purchase[party_pr] if party_pr else "UNKNOWN"
-
+    dfpr["Party"] = purchase[party_pr] "
     dfpr["Invoice"] = purchase[invoice_pr].apply(clean_invoice)
 
     dfpr["TaxablePR"] = num(purchase[taxable_pr]) if taxable_pr else 0
