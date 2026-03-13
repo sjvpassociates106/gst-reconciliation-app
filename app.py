@@ -143,9 +143,25 @@ if gstr_file and purchase_file:
     )
 
 
-    # ---------- LOAD PURCHASE REGISTER ----------
+    # -------- Load Purchase Register --------
 
-    purchase = pd.read_excel(purchase_file)
+purchase_raw = pd.read_excel(purchase_file, header=None)
+
+header_row = 0
+
+for i in range(20):
+
+    row = " ".join(purchase_raw.iloc[i].astype(str).str.lower())
+
+    if "invoice" in row or "bill" in row or "voucher" in row:
+        header_row = i
+        break
+
+# reload using detected header
+purchase = pd.read_excel(purchase_file, header=header_row)
+
+# remove ₹ symbol from headers
+purchase.columns = purchase.columns.astype(str).str.replace("₹","")
 
 
     gstin_pr=None
