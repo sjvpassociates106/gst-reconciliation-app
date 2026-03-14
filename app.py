@@ -66,7 +66,8 @@ if gstr_file and purchase_file:
 
     gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header2b)
 
-    # Detect columns
+       # Detect columns (improved detection)
+
     gstin_col = None
     party_col = None
     invoice_col = None
@@ -77,27 +78,28 @@ if gstr_file and purchase_file:
 
     for col in gstr2b.columns:
 
-        c = str(col).lower().replace("₹", "")
+        c = str(col).lower()
+        c = c.replace("₹","").replace("(","").replace(")","").strip()
 
         if "gstin" in c:
             gstin_col = col
 
-        if "trade" in c or "legal" in c:
+        elif "trade" in c or "legal" in c:
             party_col = col
 
-        if "invoice" in c:
+        elif "invoice number" in c:
             invoice_col = col
 
-        if "taxable" in c:
+        elif "taxable value" in c:
             taxable_col = col
 
-        if "integrated" in c:
+        elif "integrated tax" in c or "igst" in c:
             igst_col = col
 
-        if "central" in c:
+        elif "central tax" in c or "cgst" in c:
             cgst_col = col
 
-        if "state" in c or "ut" in c:
+        elif "state/ut tax" in c or "state tax" in c or "sgst" in c:
             sgst_col = col
 
 
@@ -109,9 +111,9 @@ if gstr_file and purchase_file:
 
     df2b["Taxable2B"] = num(gstr2b[taxable_col])
 
-    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
-    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
-    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
+    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col in gstr2b.columns else 0
+    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col in gstr2b.columns else 0
+    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col in gstr2b.columns else 0
 
 
     # Remove duplicate invoices
