@@ -10,6 +10,28 @@ st.title("GST 2B vs Purchase Register Reconciliation")
 gstr_file = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 purchase_file = st.file_uploader("Upload Purchase Register", type=["xls","xlsx"])
 
+def detect_invoice_column(df):
+
+    # Step 1: Try by column name
+    patterns = ["invoice", "inv", "bill", "doc", "voucher"]
+
+    for col in df.columns:
+        c = str(col).lower()
+        for p in patterns:
+            if p in c:
+                return col
+
+    # Step 2: Try by data pattern (AI-like detection)
+    for col in df.columns:
+
+        sample = df[col].astype(str).head(20)
+
+        match_count = sample.str.contains(r"[A-Za-z]*\d+", regex=True).sum()
+
+        if match_count > 10:  # many values look like invoice numbers
+            return col
+
+    return None
 
 # -------- Functions --------
 
