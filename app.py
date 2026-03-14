@@ -109,9 +109,9 @@ if gstr_file and purchase_file:
 
     df2b["Taxable2B"] = num(gstr2b[taxable_col])
 
-    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
-    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
-    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
+    df2b["Integrated Tax2B"] = num(gstr2b[igst_col]) if igst_col else 0
+    df2b["Central Tax2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
+    df2b["State Tax2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
 
 
     # Remove duplicate invoices
