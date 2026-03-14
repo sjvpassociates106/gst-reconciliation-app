@@ -89,6 +89,21 @@ def load_gstr2b(file):
 gstr2b = load_gstr2b(gstr_file)
 
     invoice_col = None
+
+for col in gstr2b.columns:
+
+    c = str(col).lower()
+
+    if "invoice" in c:
+        invoice_col = col
+        break
+
+
+if invoice_col is None:
+    st.write("Available columns in GSTR2B:")
+    st.write(list(gstr2b.columns))
+    st.error("Invoice column not found in GSTR2B")
+    st.stop()
     taxable_col = None
     igst_col = None
     cgst_col = None
