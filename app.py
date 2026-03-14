@@ -62,7 +62,31 @@ if gstr_file and purchase_file:
 
     # -------- GSTR2B --------
 
-    gstr2b = pd.read_excel(gstr_file, sheet_name="B2B")
+   import pandas as pd
+
+def load_gstr2b(file):
+
+    temp = pd.read_excel(file, sheet_name="B2B", header=None)
+
+    header_row = None
+
+    for i in range(20):
+
+        row = " ".join(temp.iloc[i].astype(str).str.lower())
+
+        if "invoice" in row and "gstin" in row:
+            header_row = i
+            break
+
+    if header_row is None:
+        raise Exception("Cannot detect header row in GSTR2B")
+
+    df = pd.read_excel(file, sheet_name="B2B", header=header_row)
+
+    return df
+
+
+gstr2b = load_gstr2b(gstr_file)
 
     invoice_col = None
     taxable_col = None
