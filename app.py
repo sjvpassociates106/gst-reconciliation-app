@@ -87,8 +87,7 @@ def load_gstr2b(file):
 
 
 gstr2b = load_gstr2b(gstr_file)
-
-    invoice_col = None
+invoice_col = None
 
 for col in gstr2b.columns:
 
