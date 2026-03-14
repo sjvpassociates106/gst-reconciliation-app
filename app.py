@@ -19,17 +19,10 @@ def clean_invoice(inv):
         return ""
 
     inv = str(inv).upper()
-
-    # remove spaces
     inv = inv.replace(" ", "")
-
-    # remove special characters
     inv = re.sub(r"[^A-Z0-9]", "", inv)
-
-    # remove year patterns
     inv = re.sub(r"20[0-9]{2}", "", inv)
 
-    # extract numeric portion
     numbers = re.findall(r"\d+", inv)
 
     if numbers:
@@ -50,7 +43,7 @@ def detect_header(file, sheet):
 
         row = " ".join(temp.iloc[i].astype(str).str.lower())
 
-        if "invoice" in row and "gst" in row:
+        if "invoice" in row:
             return i
 
     return 0
@@ -60,14 +53,11 @@ def detect_header(file, sheet):
 
 if gstr_file and purchase_file:
 
-    # ----- Load GSTR2B -----
-
     header2b = detect_header(gstr_file, "B2B")
 
     gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header2b)
 
-       # Detect columns (improved detection)
-
+    # Detect columns
     gstin_col = None
     party_col = None
     invoice_col = None
@@ -79,27 +69,29 @@ if gstr_file and purchase_file:
     for col in gstr2b.columns:
 
         c = str(col).lower()
+
+        # remove special characters
         c = c.replace("₹","").replace("(","").replace(")","").strip()
 
         if "gstin" in c:
             gstin_col = col
 
-        elif "trade" in c or "legal" in c:
+        if "trade" in c or "legal" in c:
             party_col = col
 
-        if "invoice" in c and ("no" in c or "number" in c or "num" in c):
-    invoice_col = col
+        if "invoice number" in c:
+            invoice_col = col
 
-        elif "taxable value" in c:
+        if "taxable value" in c:
             taxable_col = col
 
-        elif "integrated tax" in c or "igst" in c:
+        if "integrated tax" in c:
             igst_col = col
 
-        elif "central tax" in c or "cgst" in c:
+        if "central tax" in c:
             cgst_col = col
 
-        elif "state/ut tax" in c or "state tax" in c or "sgst" in c:
+        if "state" in c and "tax" in c:
             sgst_col = col
 
 
@@ -111,9 +103,9 @@ if gstr_file and purchase_file:
 
     df2b["Taxable2B"] = num(gstr2b[taxable_col])
 
-    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col in gstr2b.columns else 0
-    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col in gstr2b.columns else 0
-    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col in gstr2b.columns else 0
+    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
+    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
+    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
 
 
     # Remove duplicate invoices
