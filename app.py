@@ -87,8 +87,8 @@ if gstr_file and purchase_file:
         elif "trade" in c or "legal" in c:
             party_col = col
 
-        elif "invoice number" in c:
-            invoice_col = col
+        if "invoice" in c and ("no" in c or "number" in c or "num" in c):
+    invoice_col = col
 
         elif "taxable value" in c:
             taxable_col = col
