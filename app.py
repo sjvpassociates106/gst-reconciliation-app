@@ -61,26 +61,22 @@ if gstr_file and purchase_file:
 
         c = str(col).lower()
 
-        # clean column name properly
+        # clean column name
         c = c.replace("₹","")
         c = c.replace("(", "").replace(")", "")
         c = c.replace("_", " ")
         c = c.replace("-", " ")
         c = " ".join(c.split())
 
-        # -------- TAXABLE --------
         if "taxable" in c:
             taxable = col
 
-        # -------- IGST --------
         elif "integrated tax" in c or "igst" in c:
             igst = col
 
-        # -------- CGST --------
         elif "central tax" in c or "cgst" in c:
             cgst = col
 
-        # -------- SGST --------
         elif "state" in c or "sgst" in c or "utgst" in c:
             sgst = col
 
