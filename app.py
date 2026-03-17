@@ -24,15 +24,48 @@ def clean_invoice(inv):
 def num(series):
     return pd.to_numeric(series, errors="coerce").fillna(0)
 
+def load_gstr2b_ai(file):
 
-def detect_header(file, sheet):
-    temp = pd.read_excel(file, sheet_name=sheet, header=None)
+    temp = pd.read_excel(file, sheet_name="B2B", header=None)
+
+    header_row = 0
 
     for i in range(20):
         row = " ".join(temp.iloc[i].astype(str).str.lower())
         if "invoice" in row and "gst" in row:
-            return i
-    return 0
+            header_row = i
+            break
+
+    df = pd.read_excel(file, sheet_name="B2B", header=header_row)
+
+    return df
+
+
+def detect_gst_columns_ai(df):
+
+    igst = cgst = sgst = taxable = None
+
+    for col in df.columns:
+
+        sample = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+        if sample.sum() == 0:
+            continue
+
+        avg = sample[sample > 0].mean() if len(sample[sample > 0]) > 0 else 0
+
+        if avg < 10000:
+            if cgst is None:
+                cgst = col
+            elif sgst is None:
+                sgst = col
+            elif igst is None:
+                igst = col
+        else:
+            if taxable is None:
+                taxable = col
+
+    return taxable, igst, cgst, sgst
 
 
 # -------- PROCESS --------
@@ -40,19 +73,11 @@ def detect_header(file, sheet):
 if gstr_file and purchase_file:
 
     # ----- LOAD GSTR2B -----
-    header2b = detect_header(gstr_file, "B2B")
-    gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header2b)
-
+   
     gstin_col = party_col = invoice_col = None
     taxable_col = igst_col = cgst_col = sgst_col = None
 
-    for col in gstr2b.columns:
-
-        c = str(col).lower()
-        c = c.replace("₹","").replace("(", "").replace(")", "")
-        c = c.replace("_", " ").replace("-", " ")
-        c = " ".join(c.split())
-
+    
         if "gstin" in c:
             gstin_col = col
 
