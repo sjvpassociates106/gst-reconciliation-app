@@ -56,7 +56,6 @@ if gstr_file and purchase_file:
     taxable_col = igst_col = cgst_col = sgst_col = None
 
     for col in gstr2b.columns:
-
     c = str(col).lower()
 
     # clean properly
