@@ -57,29 +57,38 @@ if gstr_file and purchase_file:
 
     for col in gstr2b.columns:
 
-        c = str(col).lower()
+    c = str(col).lower()
 
-        if "gstin" in c or "supplier" in c:
-            gstin_col = col
+    # clean properly
+    c = c.replace("₹","")
+    c = c.replace("(", "").replace(")", "")
+    c = c.replace("/", " ")
+    c = c.replace("-", " ")
+    c = " ".join(c.split())
 
-        if "trade" in c or "legal" in c:
-            party_col = col
+    if "gstin" in c:
+        gstin_col = col
 
-        if "invoice number" in c:
-            invoice_col = col
+    if "trade" in c or "legal" in c:
+        party_col = col
 
-        if "taxable value" in c:
-            taxable_col = col
+    if "invoice number" in c:
+        invoice_col = col
 
-        if "integrated tax" in c:
-            igst_col = col
+    if "taxable value" in c:
+        taxable_col = col
 
-        if "central tax" in c:
-            cgst_col = col
+    # 🔥 STRONG GST DETECTION
+    if "integrated" in c or "igst" in c:
+        igst_col = col
 
-        if "state" in c:
-            sgst_col = col
+    if "central" in c:
+        cgst_col = col
 
+    if "state" in c or "ut" in c:
+        sgst_col = col
+
+    st.write("Detected GST Columns:", cgst_col, sgst_col, igst_col)
 
     df2b = pd.DataFrame()
 
