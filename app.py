@@ -66,10 +66,10 @@ if gstr_file and purchase_file:
 
         c = str(col).lower()
 
-        if "gstin" in c:
+        if "gstin" in c or "supplier" in c:
             gstin_col = col
 
-        if "trade" in c or "legal" in c:
+        if "trade" in c or "legal" in c or "supplier" in c:
             party_col = col
 
         if "invoice number" in c:
