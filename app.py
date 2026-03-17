@@ -17,8 +17,7 @@ def clean_invoice(inv):
         return ""
     inv = str(inv).upper()
     inv = re.sub(r"[^A-Z0-9]", "", inv)
-    inv = re.sub(r"20[2-3][0-9]", "", inv)
-    return inv[-6:]
+    return inv[-6:] if len(inv) > 6 else inv
 
 
 def num(series):
@@ -28,20 +27,30 @@ def num(series):
 def detect_header(file, sheet):
     temp = pd.read_excel(file, sheet_name=sheet, header=None)
 
-    for i in range(20):
+    max_rows = min(20, len(temp))
+    best_row = 0
+    best_score = 0
+
+    keywords = ["gstin", "invoice", "taxable", "tax"]
+
+    for i in range(max_rows):
         row = " ".join(temp.iloc[i].astype(str).str.lower())
-        if "invoice" in row and "gst" in row:
-            return i
-    return 0
+        score = sum([1 for k in keywords if k in row])
+
+        if score > best_score:
+            best_score = score
+            best_row = i
+
+    return best_row
 
 
 # -------- PROCESS --------
 
 if gstr_file and purchase_file:
 
-    # ----- LOAD GSTR2B -----
-    header2b = detect_header(gstr_file, "B2B")
-    gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header2b)
+    # ----- LOAD GSTR2B (MULTI HEADER FIX) -----
+    gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=[0,1])
+    gstr2b.columns = [' '.join([str(i) for i in col]).strip().lower() for col in gstr2b.columns]
 
     gstin_col = party_col = invoice_col = None
     taxable_col = igst_col = cgst_col = sgst_col = None
@@ -49,48 +58,39 @@ if gstr_file and purchase_file:
     for col in gstr2b.columns:
 
         c = str(col).lower()
-        c = c.replace("₹","").replace("(", "").replace(")", "")
-        c = c.replace("_", " ").replace("-", " ")
-        c = " ".join(c.split())
 
-        if "gstin" in c:
+        if "gstin" in c or "supplier" in c:
             gstin_col = col
 
         if "trade" in c or "legal" in c:
             party_col = col
 
-        if "invoice" in c:
+        if "invoice number" in c:
             invoice_col = col
 
-        if "taxable" in c:
+        if "taxable value" in c:
             taxable_col = col
 
-        if "integrated tax" in c or "igst" in c:
+        if "integrated tax" in c:
             igst_col = col
 
-        if "central tax" in c or "cgst" in c:
+        if "central tax" in c:
             cgst_col = col
 
-        if "state" in c or "sgst" in c or "ut" in c:
+        if "state" in c:
             sgst_col = col
 
 
     df2b = pd.DataFrame()
 
-    df2b["GSTIN"] = gstr2b[gstin_col].astype(str).str.upper().str.strip()
-    df2b["Party"] = gstr2b[party_col].astype(str).str.upper().str.strip()
-    df2b["Invoice"] = gstr2b[invoice_col].apply(clean_invoice)
+    df2b["GSTIN"] = gstr2b[gstin_col].astype(str).str.upper().str.strip() if gstin_col else ""
+    df2b["Party"] = gstr2b[party_col].astype(str).str.upper().str.strip() if party_col else ""
+    df2b["Invoice"] = gstr2b[invoice_col].apply(clean_invoice) if invoice_col else ""
 
     df2b["Taxable2B"] = num(gstr2b[taxable_col]) if taxable_col else 0
     df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
     df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
     df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
-
-    # fix None → 0
-    df2b["Taxable2B"] = num(df2b["Taxable2B"])
-    df2b["IGST2B"] = num(df2b["IGST2B"])
-    df2b["CGST2B"] = num(df2b["CGST2B"])
-    df2b["SGST2B"] = num(df2b["SGST2B"])
 
     df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).sum()
 
@@ -130,26 +130,42 @@ if gstr_file and purchase_file:
 
     dfpr = pd.DataFrame()
 
-    dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip()
-    dfpr["Party"] = purchase[party_pr].astype(str).str.upper().str.strip()
-    dfpr["Invoice"] = purchase[invoice_pr].apply(clean_invoice)
+    dfpr["GSTIN"] = purchase[gstin_pr].astype(str).str.upper().str.strip() if gstin_pr else ""
+    dfpr["Party"] = purchase[party_pr].astype(str) if party_pr else ""
+    dfpr["Invoice"] = purchase[invoice_pr].apply(clean_invoice) if invoice_pr else ""
 
     dfpr["TaxablePR"] = num(purchase[taxable_pr]) if taxable_pr else 0
     dfpr["IGSTPR"] = num(purchase[igst_pr]) if igst_pr else 0
     dfpr["CGSTPR"] = num(purchase[cgst_pr]) if cgst_pr else 0
     dfpr["SGSTPR"] = num(purchase[sgst_pr]) if sgst_pr else 0
 
-    # fix None → 0
-    dfpr["TaxablePR"] = num(dfpr["TaxablePR"])
-    dfpr["IGSTPR"] = num(dfpr["IGSTPR"])
-    dfpr["CGSTPR"] = num(dfpr["CGSTPR"])
-    dfpr["SGSTPR"] = num(dfpr["SGSTPR"])
-
     dfpr = dfpr.groupby(["GSTIN","Invoice"], as_index=False).sum()
 
 
     # ----- MERGE -----
     recon = pd.merge(dfpr, df2b, on=["GSTIN","Invoice"], how="outer", indicator=True)
+
+
+    # ----- CLEAN OUTPUT -----
+    recon = recon.fillna({
+        "GSTIN": "",
+        "Party_x": "",
+        "Party_y": "",
+        "Invoice": "",
+        "TaxablePR": 0,
+        "IGSTPR": 0,
+        "CGSTPR": 0,
+        "SGSTPR": 0,
+        "Taxable2B": 0,
+        "IGST2B": 0,
+        "CGST2B": 0,
+        "SGST2B": 0
+    })
+
+    # Merge party name
+    recon["Party"] = recon["Party_x"].replace("", None)
+    recon["Party"] = recon["Party"].fillna(recon["Party_y"])
+    recon = recon.drop(columns=["Party_x","Party_y"])
 
 
     # ----- CHECK -----
@@ -186,7 +202,18 @@ if gstr_file and purchase_file:
     recon = recon.drop(columns=["_merge"])
 
 
-    # ----- OUTPUT -----
+    # ----- FINAL FORMAT -----
+    cols = [
+        "GSTIN","Party","Invoice",
+        "TaxablePR","CGSTPR","SGSTPR","IGSTPR",
+        "Taxable2B","CGST2B","SGST2B","IGST2B",
+        "Status","Reason"
+    ]
+
+    recon = recon[cols]
+    recon = recon.sort_values(by=["GSTIN","Invoice"])
+
+
     st.subheader("Reconciliation Result")
     st.dataframe(recon, use_container_width=True)
 
