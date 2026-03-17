@@ -28,19 +28,24 @@ def num(x):
 # -------- HEADER DETECTION -------- #
 
 def detect_header(file, sheet):
+
     temp = pd.read_excel(file, sheet_name=sheet, header=None)
 
+    max_rows = min(20, len(temp))  # 🔥 FIX
+
     best_row = 0
-    max_score = 0
+    best_score = 0
 
     keywords = ["gstin", "invoice", "taxable", "tax"]
 
-    for i in range(20):
+    for i in range(max_rows):
+
         row = " ".join(temp.iloc[i].astype(str).str.lower())
+
         score = sum([1 for k in keywords if k in row])
 
-        if score > max_score:
-            max_score = score
+        if score > best_score:
+            best_score = score
             best_row = i
 
     return best_row
