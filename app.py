@@ -235,13 +235,18 @@ for col in gstr2b.columns:
 
 
     # ----- DOWNLOAD -----
-    buffer = BytesIO()
-    recon.to_excel(buffer, index=False)
+   # ----- DOWNLOAD -----
+buffer = BytesIO()
+recon.to_excel(buffer, index=False)
+
+if "download_done" not in st.session_state:
 
     st.download_button(
-    label="Download Excel Report",
-    data=buffer.getvalue(),
-    file_name="GST_Reconciliation_Output.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    key="download_excel_1"   # 🔥 IMPORTANT
-)
+        label="Download Excel Report",
+        data=buffer.getvalue(),
+        file_name="GST_Reconciliation_Output.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="download_excel_unique"
+    )
+
+    st.session_state["download_done"] = True
