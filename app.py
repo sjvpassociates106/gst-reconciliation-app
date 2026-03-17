@@ -239,8 +239,9 @@ for col in gstr2b.columns:
     recon.to_excel(buffer, index=False)
 
     st.download_button(
-        label="Download Excel Report",
-        data=buffer.getvalue(),
-        file_name="GST_Reconciliation_Output.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    label="Download Excel Report",
+    data=buffer.getvalue(),
+    file_name="GST_Reconciliation_Output.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    key="download_excel_1"   # 🔥 IMPORTANT
+)
