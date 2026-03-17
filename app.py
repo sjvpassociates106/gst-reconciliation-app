@@ -48,12 +48,12 @@ def detect_header(file, sheet):
 
 if gstr_file and purchase_file:
 
-    # ----- LOAD GSTR2B (MULTI HEADER FIX) -----
+    # load data FIRST
     gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=[0,1])
+
+    # flatten columns
     gstr2b.columns = [' '.join([str(i) for i in col]).strip().lower() for col in gstr2b.columns]
 
-    gstin_col = party_col = invoice_col = None
-taxable_col = igst_col = cgst_col = sgst_col = None
 
 for col in gstr2b.columns:
 
