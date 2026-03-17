@@ -136,10 +136,10 @@ if gstr_file and purchase_file:
     df2b["Party"] = gstr2b[cols.get("party","")].astype(str)
     df2b["Invoice"] = gstr2b[cols.get("invoice","")].apply(clean_invoice)
 
-    df2b["Taxable2B"] = num(gstr2b[cols.get("taxable","")])
-    df2b["IGST2B"] = num(gstr2b[cols.get("igst","")])
-    df2b["CGST2B"] = num(gstr2b[cols.get("cgst","")])
-    df2b["SGST2B"] = num(gstr2b[cols.get("sgst","")])
+    df2b["Taxable2B"] = num(gstr2b[cols["taxable"]]) if "taxable" in cols else 0
+    df2b["IGST2B"] = num(gstr2b[cols["igst"]]) if "igst" in cols else 0
+    df2b["CGST2B"] = num(gstr2b[cols["cgst"]]) if "cgst" in cols else 0
+    df2b["SGST2B"] = num(gstr2b[cols["sgst"]]) if "sgst" in cols else 0
 
     df2b = df2b.groupby(["GSTIN","Invoice"], as_index=False).sum()
 
@@ -161,10 +161,10 @@ if gstr_file and purchase_file:
     dfpr["Party"] = purchase[colsp.get("party","")].astype(str)
     dfpr["Invoice"] = purchase[colsp.get("invoice","")].apply(clean_invoice)
 
-    dfpr["TaxablePR"] = num(purchase[colsp.get("taxable","")])
-    dfpr["IGSTPR"] = num(purchase[colsp.get("igst","")])
-    dfpr["CGSTPR"] = num(purchase[colsp.get("cgst","")])
-    dfpr["SGSTPR"] = num(purchase[colsp.get("sgst","")])
+    df2b["Taxable2B"] = num(gstr2b[cols["taxable"]]) if "taxable" in cols else 0
+    df2b["IGST2B"] = num(gstr2b[cols["igst"]]) if "igst" in cols else 0
+    df2b["CGST2B"] = num(gstr2b[cols["cgst"]]) if "cgst" in cols else 0
+    df2b["SGST2B"] = num(gstr2b[cols["sgst"]]) if "sgst" in cols else 0
 
     dfpr = dfpr.groupby(["GSTIN","Invoice"], as_index=False).sum()
 
