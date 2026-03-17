@@ -64,7 +64,11 @@ for col in gstr2b.columns:
     c = c.replace("(", "").replace(")", "")
     c = c.replace("/", " ")
     c = c.replace("-", " ")
+    c = c.replace("_", " ")
     c = " ".join(c.split())
+
+    # DEBUG (run once)
+    # st.write(c)
 
     if "gstin" in c:
         gstin_col = col
@@ -75,29 +79,23 @@ for col in gstr2b.columns:
     if "invoice number" in c:
         invoice_col = col
 
-    if "taxable value" in c:
+    if "taxable" in c:
         taxable_col = col
 
+    # 🔥 VERY STRONG GST DETECTION
     if "integrated" in c or "igst" in c:
         igst_col = col
 
-    if "central" in c:
+    if "central" in c or "cgst" in c:
         cgst_col = col
 
-    if "state" in c or "ut" in c:
+    if "state" in c or "sgst" in c or "ut" in c:
         sgst_col = col
-        
-    # 🔥 STRONG GST DETECTION
-    if "integrated" in c or "igst" in c:
-        igst_col = col
-
-    if "central" in c:
-        cgst_col = col
-
-    if "state" in c or "ut" in c:
-        sgst_col = col
-
-    st.write("Detected GST Columns:", cgst_col, sgst_col, igst_col)
+   
+    st.write("Detected Columns:",
+         "CGST =", cgst_col,
+         "SGST =", sgst_col,
+         "IGST =", igst_col)
 
     df2b = pd.DataFrame()
 
