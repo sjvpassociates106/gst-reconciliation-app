@@ -53,9 +53,10 @@ if gstr_file and purchase_file:
     gstr2b.columns = [' '.join([str(i) for i in col]).strip().lower() for col in gstr2b.columns]
 
     gstin_col = party_col = invoice_col = None
-    taxable_col = igst_col = cgst_col = sgst_col = None
+taxable_col = igst_col = cgst_col = sgst_col = None
 
-    for col in gstr2b.columns:
+for col in gstr2b.columns:
+
     c = str(col).lower()
 
     # clean properly
@@ -77,6 +78,15 @@ if gstr_file and purchase_file:
     if "taxable value" in c:
         taxable_col = col
 
+    if "integrated" in c or "igst" in c:
+        igst_col = col
+
+    if "central" in c:
+        cgst_col = col
+
+    if "state" in c or "ut" in c:
+        sgst_col = col
+        
     # 🔥 STRONG GST DETECTION
     if "integrated" in c or "igst" in c:
         igst_col = col
