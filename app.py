@@ -53,39 +53,57 @@ if gstr_file and purchase_file:
 
     # ----- Load GSTR2B -----
 
-    def detect_gst_columns(df):
+    header2b = detect_header(gstr_file, "B2B")
 
-    igst = cgst = sgst = taxable = None
+    gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=header2b)
 
-    for col in df.columns:
+    # Detect columns
+    gstin_col = None
+    party_col = None
+    invoice_col = None
+    taxable_col = None
+    igst_col = None
+    cgst_col = None
+    sgst_col = None
 
-        c = str(col).lower()
+    for col in gstr2b.columns:
 
-        # clean column name
-        c = c.replace("₹","")
-        c = c.replace("(", "").replace(")", "")
-        c = c.replace("_", " ")
-        c = c.replace("-", " ")
-        c = " ".join(c.split())
+        c = str(col).lower().replace("₹", "")
+
+        if "gstin" in c:
+            gstin_col = col
+
+        if "trade" in c or "legal" in c:
+            party_col = col
+
+        if "invoice" in c:
+            invoice_col = col
 
         if "taxable" in c:
-            taxable = col
+            taxable_col = col
 
-        elif "integrated tax" in c or "igst" in c:
-            igst = col
+        if "integrated" in c:
+            igst_col = col
 
-        elif "central tax" in c or "cgst" in c:
-            cgst = col
+        if "central" in c:
+            cgst_col = col
 
-        elif "state" in c or "sgst" in c or "utgst" in c:
-            sgst = col
+        if "state" in c or "ut" in c:
+            sgst_col = col
 
-    return taxable, igst, cgst, sgst
 
-    # convert None to 0
-df2b["CGST2B"] = pd.to_numeric(df2b["CGST2B"], errors="coerce").fillna(0)
-df2b["SGST2B"] = pd.to_numeric(df2b["SGST2B"], errors="coerce").fillna(0)
-df2b["IGST2B"] = pd.to_numeric(df2b["IGST2B"], errors="coerce").fillna(0)
+    df2b = pd.DataFrame()
+
+    df2b["GSTIN"] = gstr2b[gstin_col].astype(str).str.upper().str.strip()
+    df2b["Party"] = gstr2b[party_col]
+    df2b["Invoice"] = gstr2b[invoice_col].apply(clean_invoice)
+
+    df2b["Taxable2B"] = num(gstr2b[taxable_col])
+
+    df2b["IGST2B"] = num(gstr2b[igst_col]) if igst_col else 0
+    df2b["CGST2B"] = num(gstr2b[cgst_col]) if cgst_col else 0
+    df2b["SGST2B"] = num(gstr2b[sgst_col]) if sgst_col else 0
+
 
     # Remove duplicate invoices
     df2b = df2b.groupby(["GSTIN", "Invoice"], as_index=False).sum()
