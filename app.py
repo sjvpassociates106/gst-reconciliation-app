@@ -47,11 +47,9 @@ if gstr_file and purchase_file:
 
     for col in gstr2b.columns:
 
-        c = str(col).lower()
-        c = re.sub(r"[₹()/\-]", " ", c)
-        c = " ".join(c.split())
+        st.write("All Columns:", gstr2b.columns)
 
-        if "gstin" in c or "supplier" in c:
+        if ("gstin" in c and "supplier" in c) or c.startswith("gstin"):
             gstin_col = col
         if "trade" in c or "legal" in c:
             party_col = col
