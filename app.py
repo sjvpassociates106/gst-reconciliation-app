@@ -79,7 +79,7 @@ for col in gstr2b.columns:
         sgst_col = col
     df2b = pd.DataFrame()
 
-    df2b["GSTIN"] = gstr2b[gstin_col].astype(str).str.strip()
+    df2b["GSTIN"] = gstr2b[gstin_col]
     df2b["Party"] = gstr2b[party_col]
     df2b["Invoice"] = gstr2b[invoice_col].apply(clean_invoice)
 
