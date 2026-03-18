@@ -49,7 +49,9 @@ if gstr_file and purchase_file:
 
         st.write("All Columns:", gstr2b.columns)
 
-        if ("gstin" in c and "supplier" in c) or c.startswith("gstin"):
+        if "gstin" in c:
+            gstin_col = col
+        elif "supplier" in c:
             gstin_col = col
         if "trade" in c or "legal" in c:
             party_col = col
