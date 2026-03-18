@@ -38,27 +38,16 @@ def num(series):
 
 if gstr_file and purchase_file:
 
-    # -------- LOAD GSTR2B --------
+    # STEP 1: LOAD FIRST
     gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=2)
-    gstr2b.columns = [' '.join([str(i) for i in col]).lower() for col in gstr2b.columns]
 
-    gstin_col = party_col = invoice_col = None
-    taxable_col = igst_col = cgst_col = sgst_col = None
+    # STEP 2: THEN LOOP
+    for col in gstr2b.columns:
 
-for col in gstr2b.columns:
+        c = str(col).lower()
 
-    c = str(col).lower()
-
-    # clean
-    c = c.replace("₹","")
-    c = c.replace("(", "").replace(")", "")
-    c = c.replace("/", " ")
-    c = c.replace("-", " ")
-    c = " ".join(c.split())
-
-    # detection
-    if "gstin" in c:
-        gstin_col = col
+     if "gstin" in c:
+            gstin_col = col
 
     elif "trade" in c or "legal" in c:
         party_col = col
