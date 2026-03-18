@@ -39,7 +39,7 @@ def num(series):
 if gstr_file and purchase_file:
 
     # -------- LOAD GSTR2B --------
-    gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=[0,1])
+    gstr2b = pd.read_excel(gstr_file, sheet_name="B2B", header=2)
     gstr2b.columns = [' '.join([str(i) for i in col]).lower() for col in gstr2b.columns]
 
     gstin_col = party_col = invoice_col = None
