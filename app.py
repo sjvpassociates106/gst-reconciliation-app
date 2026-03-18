@@ -45,27 +45,38 @@ if gstr_file and purchase_file:
     gstin_col = party_col = invoice_col = None
     taxable_col = igst_col = cgst_col = sgst_col = None
 
-    for col in gstr2b.columns:
+for col in gstr2b.columns:
 
-        st.write("All Columns:", gstr2b.columns)
+    c = str(col).lower()
 
-        if "gstin" in c:
-            gstin_col = col
-        elif "supplier" in c:
-            gstin_col = col
-        if "trade" in c or "legal" in c:
-            party_col = col
-        if "invoice number" in c:
-            invoice_col = col
-        if "taxable" in c:
-            taxable_col = col
-        if "integrated" in c:
-            igst_col = col
-        if "central" in c:
-            cgst_col = col
-        if "state" in c or "ut" in c:
-            sgst_col = col
+    # clean
+    c = c.replace("₹","")
+    c = c.replace("(", "").replace(")", "")
+    c = c.replace("/", " ")
+    c = c.replace("-", " ")
+    c = " ".join(c.split())
 
+    # detection
+    if "gstin" in c:
+        gstin_col = col
+
+    elif "trade" in c or "legal" in c:
+        party_col = col
+
+    elif "invoice" in c:
+        invoice_col = col
+
+    elif "taxable" in c:
+        taxable_col = col
+
+    elif "integrated" in c:
+        igst_col = col
+
+    elif "central" in c:
+        cgst_col = col
+
+    elif "state" in c or "ut" in c:
+        sgst_col = col
     df2b = pd.DataFrame()
 
     df2b["GSTIN"] = gstr2b[gstin_col].astype(str).str.strip()
