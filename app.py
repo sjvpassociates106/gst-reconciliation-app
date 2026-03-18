@@ -51,7 +51,7 @@ if gstr_file and purchase_file:
         c = re.sub(r"[₹()/\-]", " ", c)
         c = " ".join(c.split())
 
-        if "gstin" in c:
+        if "gstin" in c or "supplier" in c:
             gstin_col = col
         if "trade" in c or "legal" in c:
             party_col = col
