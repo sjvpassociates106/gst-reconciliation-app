@@ -13,19 +13,21 @@ file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx","xls","csv"]
 # ---------------------------
 # READ FILES
 # ---------------------------
-def read_2b_file(file):
-    xls = pd.ExcelFile(file, engine="openpyxl")
+def read_file(file):
+    try:
+        # Try multiple header rows
+        for i in range(5):
+            df = pd.read_excel(file, header=i)
 
-    for sheet in xls.sheet_names:
-        if "b2b" in sheet.lower():
+            cols = [str(c).lower() for c in df.columns]
 
-            for i in range(5):  # try first 5 rows
-                df = pd.read_excel(xls, sheet_name=sheet, header=i)
+            if any("invoice" in c or "supplier" in c for c in cols):
+                return df
 
-                cols = [str(c).lower() for c in df.columns]
+        return pd.read_excel(file, engine="openpyxl")
 
-                if any("invoice" in c for c in cols):
-                    return df
+    except:
+        return pd.read_csv(file, encoding="latin1")
 
     st.error("B2B header not detected")
     return None
@@ -116,13 +118,13 @@ def preprocess_2b(df):
 def preprocess_pr(df):
     new_df = pd.DataFrame()
 
-    inv_col = get_col(df, "invoice")
-    date_col = get_col(df, "date")
-    gst_col = get_col(df, "gstin")
-    tax_col = get_col(df, "taxable")
-    cgst_col = get_col(df, "cgst")
-    sgst_col = get_col(df, "sgst")
-    igst_col = get_col(df, "igst")
+    inv_col = get_col(df, ["invoice", "supplierinvoice"])
+    date_col = get_col(df, ["date"])
+    gst_col = get_col(df, ["gstin"])
+    tax_col = get_col(df, ["taxable"])
+    cgst_col = get_col(df, ["cgst"])
+    sgst_col = get_col(df, ["sgst"])
+    igst_col = get_col(df, ["igst"])
 
     st.write("Detected PR Columns:", {
         "invoice": inv_col,
