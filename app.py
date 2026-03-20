@@ -9,7 +9,7 @@ st.title("GST Reconciliation (2B vs Purchase Register) - PRO VERSION")
 # FILE UPLOAD
 # ---------------------------
 file_2b = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
-file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx", "csv"])
+file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx","xls","csv"])
 
 # ---------------------------
 # READ FILE FUNCTIONS
