@@ -137,7 +137,7 @@ def preprocess_2b(df):
 def preprocess_pr(df):
     new_df = pd.DataFrame()
 
-    inv_col = get_col(df, ["invoice", "supplierinvoice"])
+    inv_col = get_col(df, ["supplierinvoice", "invoiceno", "invoice"])
     date_col = get_col(df, ["date"])
     gst_col = get_col(df, ["gstin"])
     tax_col = get_col(df, ["taxable"])
