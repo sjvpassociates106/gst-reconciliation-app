@@ -15,9 +15,15 @@ file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx","xls","csv"]
 # ---------------------------
 def read_2b_file(file):
     xls = pd.ExcelFile(file, engine="openpyxl")
+
     for sheet in xls.sheet_names:
         if "b2b" in sheet.lower():
-            return pd.read_excel(xls, sheet_name=sheet)
+            
+            # Read with correct header row (IMPORTANT)
+            df = pd.read_excel(xls, sheet_name=sheet, header=2)
+
+            return df
+
     st.error("B2B sheet not found")
     return None
 
