@@ -8,7 +8,7 @@ st.title("GST Reconciliation Tool (2B vs Purchase Register)")
 # FILE UPLOAD
 # ---------------------------
 file_2b = st.file_uploader("Upload GSTR-2B File", type=["xlsx", "csv"])
-file_pr = st.file_uploader("Upload Purchase Register File", type=["xlsx", "csv"])
+file_pr = st.file_uploader("Upload Purchase Register File", type=["xlsx","xls", "csv"])
 
 # ---------------------------
 # HELPER FUNCTIONS
