@@ -18,15 +18,18 @@ def read_2b_file(file):
 
     for sheet in xls.sheet_names:
         if "b2b" in sheet.lower():
-            
-            # Read with correct header row (IMPORTANT)
-            df = pd.read_excel(xls, sheet_name=sheet, header=2)
 
-            return df
+            for i in range(5):  # try first 5 rows
+                df = pd.read_excel(xls, sheet_name=sheet, header=i)
 
-    st.error("B2B sheet not found")
+                cols = [str(c).lower() for c in df.columns]
+
+                if any("invoice" in c for c in cols):
+                    return df
+
+    st.error("B2B header not detected")
     return None
-
+    
 def read_file(file):
     try:
         return pd.read_excel(file, engine="openpyxl")
