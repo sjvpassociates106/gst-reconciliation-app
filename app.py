@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
 import re
-from rapidfuzz import fuzz
 
-st.title("GST Reconciliation (2B vs Purchase Register) - PRO VERSION")
+st.title("GST Reconciliation Tool (2B vs Purchase Register)")
 
 # ---------------------------
 # FILE UPLOAD
@@ -12,17 +11,8 @@ file_2b = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx","xls","csv"])
 
 # ---------------------------
-# READ FILE FUNCTIONS
+# READ FUNCTIONS
 # ---------------------------
-def read_file(file):
-    try:
-        return pd.read_excel(file, engine="openpyxl")
-    except:
-        try:
-            return pd.read_csv(file, encoding="utf-8")
-        except:
-            return pd.read_csv(file, encoding="latin1")
-
 def read_2b_file(file):
     xls = pd.ExcelFile(file, engine="openpyxl")
     
@@ -33,15 +23,16 @@ def read_2b_file(file):
     st.error("B2B sheet not found")
     return None
 
-# ---------------------------
-# COLUMN DETECTION
-# ---------------------------
-def detect_column(df, keywords):
-    for col in df.columns:
-        for key in keywords:
-            if key in col.lower():
-                return col
-    return None
+
+def read_file(file):
+    try:
+        return pd.read_excel(file, engine="openpyxl")
+    except:
+        try:
+            return pd.read_csv(file, encoding="utf-8")
+        except:
+            return pd.read_csv(file, encoding="latin1")
+
 
 # ---------------------------
 # CLEANING FUNCTIONS
@@ -61,96 +52,127 @@ def clean_invoice(inv):
     digits = re.findall(r'\d+', inv)
     
     if digits:
-        return digits[-1][-3:]  # last 3 digits
+        return digits[-1][-3:]   # last 3 digits
     
     return inv
 
-def clean_party(p):
-    return str(p).upper().replace(" ", "").strip()
 
-# ---------------------------
-# PREPROCESS
-# ---------------------------
-def preprocess(df):
-    df.columns = df.columns.str.strip()
-    
-    col_map = {
-        "invoice": detect_column(df, ["invoice", "bill"]),
-        "date": detect_column(df, ["date"]),
-        "party": detect_column(df, ["party", "supplier", "gstin"]),
-        "taxable": detect_column(df, ["taxable"]),
-        "cgst": detect_column(df, ["cgst"]),
-        "sgst": detect_column(df, ["sgst"]),
-        "igst": detect_column(df, ["igst"]),
-    }
+def clean_common(df):
+    df["invoice"] = df["invoice"].astype(str)
+    df["invoice_clean"] = df["invoice"].apply(clean_invoice)
 
-    new_df = pd.DataFrame()
-    
-    for key, col in col_map.items():
-        new_df[key] = df[col] if col else ""
-    
-    new_df["invoice_clean"] = new_df["invoice"].apply(clean_invoice)
-    new_df["party_clean"] = new_df["party"].apply(clean_party)
+    df["party"] = df["party"].astype(str)
+    df["party_clean"] = df["party"].str.replace(" ", "").str.upper()
 
-    # numeric
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
     for col in ["taxable", "cgst", "sgst", "igst"]:
-        new_df[col] = pd.to_numeric(new_df[col], errors="coerce").fillna(0)
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # date
-    new_df["date"] = pd.to_datetime(new_df["date"], errors="coerce")
+    df = df.dropna(how="all")
 
-    return new_df
+    return df
+
+
+# ---------------------------
+# PREPROCESS (AS PER YOUR FILE)
+# ---------------------------
+def preprocess_2b(df):
+    new_df = pd.DataFrame()
+
+    new_df["invoice"] = df["Invoice number"]
+    new_df["date"] = df["Invoice Date"]
+    new_df["party"] = df["GSTIN of supplier"]
+    new_df["taxable"] = df["Taxable Value (₹)"]
+    new_df["cgst"] = df["Central Tax(₹)"]
+    new_df["sgst"] = df["State/UT Tax(₹)"]
+    new_df["igst"] = df["Integrated Tax(₹)"]
+
+    return clean_common(new_df)
+
+
+def preprocess_pr(df):
+    new_df = pd.DataFrame()
+
+    new_df["invoice"] = df["Supplier Invoice No."]
+    new_df["date"] = df["Date"]
+    new_df["party"] = df["GSTIN/UIN"]
+    new_df["taxable"] = df["Taxable Value"]
+    new_df["cgst"] = df["CGST"]
+    new_df["sgst"] = df["SGST"]
+    new_df["igst"] = df["IGST"]
+
+    return clean_common(new_df)
+
 
 # ---------------------------
 # MATCHING LOGIC
 # ---------------------------
-def match_row(row, df_2b):
-    for _, r2 in df_2b.iterrows():
-        
-        # Invoice match
-        if row["invoice_clean"] != r2["invoice_clean"]:
-            continue
-        
-        # Party fuzzy match
-        if fuzz.ratio(row["party_clean"], r2["party_clean"]) < 80:
-            continue
-        
-        # Amount tolerance
-        if abs(row["taxable"] - r2["taxable"]) > 5:
-            continue
-        
-        # Date tolerance
-        if pd.notna(row["date"]) and pd.notna(r2["date"]):
-            if abs((row["date"] - r2["date"]).days) > 3:
+def match_data(df_pr, df_2b):
+
+    result = []
+
+    for _, row in df_pr.iterrows():
+        matched = "Only in Purchase"
+
+        for _, r2 in df_2b.iterrows():
+
+            # GSTIN match (most important)
+            if row["party_clean"] != r2["party_clean"]:
                 continue
-        
-        return "Matched"
-    
-    return "Not Matched"
+
+            # Invoice match
+            if row["invoice_clean"] != r2["invoice_clean"]:
+                continue
+
+            # Amount tolerance
+            if abs(row["taxable"] - r2["taxable"]) > 5:
+                continue
+
+            # Date tolerance
+            if pd.notna(row["date"]) and pd.notna(r2["date"]):
+                if abs((row["date"] - r2["date"]).days) > 3:
+                    continue
+
+            matched = "Matched"
+            break
+
+        result.append(matched)
+
+    df_pr["Status"] = result
+
+    # 2B side
+    matched_keys = set(zip(df_pr[df_pr["Status"]=="Matched"]["invoice_clean"],
+                           df_pr[df_pr["Status"]=="Matched"]["party_clean"]))
+
+    df_2b["Status"] = df_2b.apply(
+        lambda x: "Matched" if (x["invoice_clean"], x["party_clean"]) in matched_keys else "Only in 2B",
+        axis=1
+    )
+
+    return df_pr, df_2b
+
 
 # ---------------------------
 # MAIN PROCESS
 # ---------------------------
 if file_2b and file_pr:
-    
-    df_2b = read_2b_file(file_2b)
-    df_pr = read_file(file_pr)
 
-    df_2b = preprocess(df_2b)
-    df_pr = preprocess(df_pr)
+    df_2b_raw = read_2b_file(file_2b)
+    df_pr_raw = read_file(file_pr)
 
-    # remove duplicates
+    # DEBUG (optional remove later)
+    st.write("2B RAW", df_2b_raw.head())
+    st.write("PR RAW", df_pr_raw.head())
+
+    df_2b = preprocess_2b(df_2b_raw)
+    df_pr = preprocess_pr(df_pr_raw)
+
+    # Remove duplicates
     df_2b = df_2b.drop_duplicates(subset=["invoice_clean", "party_clean", "taxable"])
     df_pr = df_pr.drop_duplicates(subset=["invoice_clean", "party_clean", "taxable"])
 
-    # Matching
-    df_pr["Status"] = df_pr.apply(lambda row: match_row(row, df_2b), axis=1)
-
-    # Identify missing in 2B
-    matched_invoices = df_pr[df_pr["Status"] == "Matched"]["invoice_clean"]
-    df_2b["Status"] = df_2b["invoice_clean"].apply(
-        lambda x: "Matched" if x in matched_invoices.values else "Only in 2B"
-    )
+    df_pr, df_2b = match_data(df_pr, df_2b)
 
     st.success("Reconciliation Completed ✅")
 
@@ -158,13 +180,14 @@ if file_2b and file_pr:
     st.subheader("Summary")
     st.write(df_pr["Status"].value_counts())
 
-    # Output
+    # Purchase Output
     st.subheader("Purchase Register Result")
     st.dataframe(df_pr)
 
+    # 2B Output
     st.subheader("2B Result")
     st.dataframe(df_2b)
 
     # Download
-    csv = df_pr.to_csv(index=False).encode('utf-8')
+    csv = df_pr.to_csv(index=False).encode("utf-8")
     st.download_button("Download Purchase Result", csv, "purchase_result.csv")
