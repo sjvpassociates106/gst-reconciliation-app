@@ -35,21 +35,27 @@ def read_2b_file(file):
 # ---------------------------
 def read_pr_file(file):
     try:
-        for i in range(6):
+        for i in range(15):   # 🔥 increase range
+
             df = pd.read_excel(file, header=i)
             cols = [str(c).lower() for c in df.columns]
 
-            if any("invoice" in c or "supplier" in c for c in cols):
+            # check for purchase header keywords
+            if any(
+                ("invoice" in c or "supplier" in c or "gstin" in c)
+                for c in cols
+            ):
+                st.write(f"✅ Purchase Header Found at Row: {i}")
                 return df
 
-        return pd.read_excel(file, engine="openpyxl")
+        st.error("❌ Purchase header not detected")
+        st.stop()
 
     except:
         try:
             return pd.read_csv(file, encoding="utf-8")
         except:
             return pd.read_csv(file, encoding="latin1")
-
 
 # ---------------------------
 # COLUMN FINDER
