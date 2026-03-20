@@ -62,7 +62,9 @@ def read_pr_file(file):
 # ---------------------------
 def get_col(df, keywords):
     for col in df.columns:
-        col_clean = str(col).lower().replace(" ", "")
+        col_clean = str(col).lower()
+        col_clean = col_clean.replace(" ", "").replace("\n", "").replace(".", "")
+
         for key in keywords:
             if key in col_clean:
                 return col
