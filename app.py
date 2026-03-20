@@ -8,17 +8,35 @@ st.title("GST Reconciliation (2B vs Purchase Register)")
 # FILE UPLOAD
 # ---------------------------
 file_2b = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
-file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx","xls","csv"])
+file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx", "csv"])
 
 # ---------------------------
-# READ FILES
+# READ 2B FILE
 # ---------------------------
-def read_file(file):
+def read_2b_file(file):
+    xls = pd.ExcelFile(file, engine="openpyxl")
+
+    for sheet in xls.sheet_names:
+        if "b2b" in sheet.lower():
+
+            for i in range(6):  # try first 6 rows
+                df = pd.read_excel(xls, sheet_name=sheet, header=i)
+                cols = [str(c).lower() for c in df.columns]
+
+                if any("invoice" in c for c in cols):
+                    return df
+
+    st.error("❌ B2B sheet/header not detected")
+    st.stop()
+
+
+# ---------------------------
+# READ PURCHASE FILE
+# ---------------------------
+def read_pr_file(file):
     try:
-        # Try multiple header rows
-        for i in range(5):
+        for i in range(6):
             df = pd.read_excel(file, header=i)
-
             cols = [str(c).lower() for c in df.columns]
 
             if any("invoice" in c or "supplier" in c for c in cols):
@@ -27,28 +45,23 @@ def read_file(file):
         return pd.read_excel(file, engine="openpyxl")
 
     except:
-        return pd.read_csv(file, encoding="latin1")
-
-    st.error("B2B header not detected")
-    return None
-    
-def read_file(file):
-    try:
-        return pd.read_excel(file, engine="openpyxl")
-    except:
         try:
             return pd.read_csv(file, encoding="utf-8")
         except:
             return pd.read_csv(file, encoding="latin1")
 
+
 # ---------------------------
-# SAFE COLUMN FINDER
+# COLUMN FINDER
 # ---------------------------
-def get_col(df, keyword):
+def get_col(df, keywords):
     for col in df.columns:
-        if keyword.lower() in col.lower():
-            return col
+        col_clean = str(col).lower().replace(" ", "")
+        for key in keywords:
+            if key in col_clean:
+                return col
     return None
+
 
 # ---------------------------
 # CLEANING
@@ -63,6 +76,7 @@ def clean_invoice(inv):
     if digits:
         return digits[-1][-3:]
     return inv
+
 
 def clean_common(df):
     df["invoice"] = df["invoice"].astype(str)
@@ -80,19 +94,20 @@ def clean_common(df):
 
     return df
 
+
 # ---------------------------
-# PREPROCESS
+# PREPROCESS 2B
 # ---------------------------
 def preprocess_2b(df):
     new_df = pd.DataFrame()
 
-    inv_col = get_col(df, "invoice")
-    date_col = get_col(df, "date")
-    gst_col = get_col(df, "gstin")
-    tax_col = get_col(df, "taxable")
-    cgst_col = get_col(df, "central")
-    sgst_col = get_col(df, "state")
-    igst_col = get_col(df, "integrated")
+    inv_col = get_col(df, ["invoice"])
+    date_col = get_col(df, ["date"])
+    gst_col = get_col(df, ["gstin"])
+    tax_col = get_col(df, ["taxable"])
+    cgst_col = get_col(df, ["central"])
+    sgst_col = get_col(df, ["state"])
+    igst_col = get_col(df, ["integrated"])
 
     st.write("Detected 2B Columns:", {
         "invoice": inv_col,
@@ -102,7 +117,7 @@ def preprocess_2b(df):
     })
 
     if inv_col is None:
-        st.error("❌ Invoice column not found in 2B file")
+        st.error("❌ Invoice column not found in 2B")
         st.stop()
 
     new_df["invoice"] = df[inv_col]
@@ -115,6 +130,10 @@ def preprocess_2b(df):
 
     return clean_common(new_df)
 
+
+# ---------------------------
+# PREPROCESS PURCHASE
+# ---------------------------
 def preprocess_pr(df):
     new_df = pd.DataFrame()
 
@@ -146,19 +165,20 @@ def preprocess_pr(df):
     new_df["igst"] = df[igst_col] if igst_col else 0
 
     return clean_common(new_df)
+
+
 # ---------------------------
-# RECONCILIATION LOGIC
+# RECONCILIATION
 # ---------------------------
 def reconcile(df_pr, df_2b):
 
     df_pr["key"] = df_pr["party_clean"] + "_" + df_pr["invoice_clean"]
     df_2b["key"] = df_2b["party_clean"] + "_" + df_2b["invoice_clean"]
 
-    result_rows = []
+    result = []
     used_2b = set()
 
     for _, pr in df_pr.iterrows():
-
         match = df_2b[df_2b["key"] == pr["key"]]
 
         if not match.empty:
@@ -169,14 +189,8 @@ def reconcile(df_pr, df_2b):
 
             if abs(pr["taxable"] - r2["taxable"]) > 1:
                 status = "Taxable Mismatch"
-            if abs(pr["cgst"] - r2["cgst"]) > 1:
-                status = "CGST Mismatch"
-            if abs(pr["sgst"] - r2["sgst"]) > 1:
-                status = "SGST Mismatch"
-            if abs(pr["igst"] - r2["igst"]) > 1:
-                status = "IGST Mismatch"
 
-            result_rows.append({
+            result.append({
                 "Date PR": pr["date"],
                 "Party PR": pr["party"],
                 "Invoice PR": pr["invoice"],
@@ -197,7 +211,7 @@ def reconcile(df_pr, df_2b):
             })
 
         else:
-            result_rows.append({
+            result.append({
                 "Date PR": pr["date"],
                 "Party PR": pr["party"],
                 "Invoice PR": pr["invoice"],
@@ -219,7 +233,7 @@ def reconcile(df_pr, df_2b):
 
     for _, r2 in df_2b.iterrows():
         if r2["key"] not in used_2b:
-            result_rows.append({
+            result.append({
                 "Date PR": "",
                 "Party PR": "",
                 "Invoice PR": "",
@@ -239,7 +253,8 @@ def reconcile(df_pr, df_2b):
                 "Status": "Not in Purchase"
             })
 
-    return pd.DataFrame(result_rows)
+    return pd.DataFrame(result)
+
 
 # ---------------------------
 # MAIN
@@ -247,34 +262,20 @@ def reconcile(df_pr, df_2b):
 if file_2b and file_pr:
 
     df_2b_raw = read_2b_file(file_2b)
-    df_pr_raw = read_file(file_pr)
+    df_pr_raw = read_pr_file(file_pr)
 
     df_2b = preprocess_2b(df_2b_raw)
     df_pr = preprocess_pr(df_pr_raw)
 
-    df_pr = df_pr.drop_duplicates(subset=["invoice_clean", "party_clean"])
-    df_2b = df_2b.drop_duplicates(subset=["invoice_clean", "party_clean"])
-
     result_df = reconcile(df_pr, df_2b)
 
-    st.success("Reconciliation Completed ✅")
+    st.success("✅ Reconciliation Completed")
 
-    # ---------------------------
-    # SUMMARY
-    # ---------------------------
     st.subheader("📊 Summary")
+    st.write(result_df["Status"].value_counts())
 
-    st.write("Total Records:", len(result_df))
-    st.write("Matched:", len(result_df[result_df["Status"] == "Matched"]))
-    st.write("Not in 2B:", len(result_df[result_df["Status"] == "Not in 2B"]))
-    st.write("Not in Purchase:", len(result_df[result_df["Status"] == "Not in Purchase"]))
-
-    # ---------------------------
-    # OUTPUT
-    # ---------------------------
     st.subheader("📋 Reconciliation Output")
     st.dataframe(result_df)
 
-    # Download
     csv = result_df.to_csv(index=False).encode("utf-8")
     st.download_button("Download Result", csv, "gst_reconciliation.csv")
