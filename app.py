@@ -75,29 +75,66 @@ def clean_common(df):
 def preprocess_2b(df):
     new_df = pd.DataFrame()
 
-    new_df["invoice"] = df[get_col(df, "invoice")]
-    new_df["date"] = df[get_col(df, "date")]
-    new_df["party"] = df[get_col(df, "gstin")]
-    new_df["taxable"] = df[get_col(df, "taxable")]
-    new_df["cgst"] = df[get_col(df, "central")]
-    new_df["sgst"] = df[get_col(df, "state")]
-    new_df["igst"] = df[get_col(df, "integrated")]
+    inv_col = get_col(df, "invoice")
+    date_col = get_col(df, "date")
+    gst_col = get_col(df, "gstin")
+    tax_col = get_col(df, "taxable")
+    cgst_col = get_col(df, "central")
+    sgst_col = get_col(df, "state")
+    igst_col = get_col(df, "integrated")
+
+    st.write("Detected 2B Columns:", {
+        "invoice": inv_col,
+        "date": date_col,
+        "gstin": gst_col,
+        "taxable": tax_col
+    })
+
+    if inv_col is None:
+        st.error("❌ Invoice column not found in 2B file")
+        st.stop()
+
+    new_df["invoice"] = df[inv_col]
+    new_df["date"] = df[date_col] if date_col else ""
+    new_df["party"] = df[gst_col] if gst_col else ""
+    new_df["taxable"] = df[tax_col] if tax_col else 0
+    new_df["cgst"] = df[cgst_col] if cgst_col else 0
+    new_df["sgst"] = df[sgst_col] if sgst_col else 0
+    new_df["igst"] = df[igst_col] if igst_col else 0
 
     return clean_common(new_df)
 
 def preprocess_pr(df):
     new_df = pd.DataFrame()
 
-    new_df["invoice"] = df[get_col(df, "invoice")]
-    new_df["date"] = df[get_col(df, "date")]
-    new_df["party"] = df[get_col(df, "gstin")]
-    new_df["taxable"] = df[get_col(df, "taxable")]
-    new_df["cgst"] = df[get_col(df, "cgst")]
-    new_df["sgst"] = df[get_col(df, "sgst")]
-    new_df["igst"] = df[get_col(df, "igst")]
+    inv_col = get_col(df, "invoice")
+    date_col = get_col(df, "date")
+    gst_col = get_col(df, "gstin")
+    tax_col = get_col(df, "taxable")
+    cgst_col = get_col(df, "cgst")
+    sgst_col = get_col(df, "sgst")
+    igst_col = get_col(df, "igst")
+
+    st.write("Detected PR Columns:", {
+        "invoice": inv_col,
+        "date": date_col,
+        "gstin": gst_col,
+        "taxable": tax_col
+    })
+
+    if inv_col is None:
+        st.error("❌ Invoice column not found in Purchase Register")
+        st.stop()
+
+    new_df["invoice"] = df[inv_col]
+    new_df["date"] = df[date_col] if date_col else ""
+    new_df["party"] = df[gst_col] if gst_col else ""
+    new_df["taxable"] = df[tax_col] if tax_col else 0
+    new_df["cgst"] = df[cgst_col] if cgst_col else 0
+    new_df["sgst"] = df[sgst_col] if sgst_col else 0
+    new_df["igst"] = df[igst_col] if igst_col else 0
 
     return clean_common(new_df)
-
 # ---------------------------
 # RECONCILIATION LOGIC
 # ---------------------------
