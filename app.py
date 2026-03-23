@@ -130,7 +130,7 @@ def preprocess_2b(df):
 
     new_df["invoice"] = df[inv_col]
     new_df["date"] = df[date_col] if date_col else ""
-    new_df["party"] = df[gst_col] if gst_col else ""
+    new_df["party"] = df[party_name_col] if party_name_col else df[gst_col]
     new_df["taxable"] = df[tax_col] if tax_col else 0
     new_df["cgst"] = df[cgst_col] if cgst_col else 0
     new_df["sgst"] = df[sgst_col] if sgst_col else 0
@@ -166,7 +166,7 @@ def preprocess_pr(df):
 
     new_df["invoice"] = df[inv_col]
     new_df["date"] = df[date_col] if date_col else ""
-    new_df["party"] = df[gst_col] if gst_col else ""
+    new_df["party"] = df[party_name_col] if party_name_col else df[gst_col]
     new_df["taxable"] = df[tax_col] if tax_col else 0
     new_df["cgst"] = df[cgst_col] if cgst_col else 0
     new_df["sgst"] = df[sgst_col] if sgst_col else 0
