@@ -19,7 +19,7 @@ def read_2b_file(file):
     for sheet in xls.sheet_names:
         if "b2b" in sheet.lower():
 
-            for i in range(6):  # try first 6 rows
+            for i in range(10):
                 df = pd.read_excel(xls, sheet_name=sheet, header=i)
                 cols = [str(c).lower() for c in df.columns]
 
@@ -35,16 +35,11 @@ def read_2b_file(file):
 # ---------------------------
 def read_pr_file(file):
     try:
-        for i in range(15):   # 🔥 increase range
-
+        for i in range(20):  # increased range
             df = pd.read_excel(file, header=i)
             cols = [str(c).lower() for c in df.columns]
 
-            # check for purchase header keywords
-            if any(
-                ("invoice" in c or "supplier" in c or "gstin" in c)
-                for c in cols
-            ):
+            if any(("invoice" in c or "supplier" in c or "gstin" in c) for c in cols):
                 st.write(f"✅ Purchase Header Found at Row: {i}")
                 return df
 
@@ -56,6 +51,7 @@ def read_pr_file(file):
             return pd.read_csv(file, encoding="utf-8")
         except:
             return pd.read_csv(file, encoding="latin1")
+
 
 # ---------------------------
 # COLUMN FINDER
@@ -93,7 +89,13 @@ def clean_common(df):
     df["party"] = df["party"].astype(str)
     df["party_clean"] = df["party"].str.replace(" ", "").str.upper()
 
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    # 🔥 SMART DATE HANDLING
+    df["date"] = pd.to_datetime(
+        df["date"],
+        errors="coerce",
+        dayfirst=True,
+        infer_datetime_format=True
+    )
 
     for col in ["taxable", "cgst", "sgst", "igst"]:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
@@ -117,11 +119,15 @@ def preprocess_2b(df):
     sgst_col = get_col(df, ["state"])
     igst_col = get_col(df, ["integrated"])
 
+    # 🔥 PARTY NAME FIX
+    party_name_col = get_col(df, ["trade", "legal", "name"])
+
     st.write("Detected 2B Columns:", {
         "invoice": inv_col,
         "date": date_col,
         "gstin": gst_col,
-        "taxable": tax_col
+        "taxable": tax_col,
+        "party_name": party_name_col
     })
 
     if inv_col is None:
@@ -130,7 +136,12 @@ def preprocess_2b(df):
 
     new_df["invoice"] = df[inv_col]
     new_df["date"] = df[date_col] if date_col else ""
-    new_df["party"] = df[party_name_col] if party_name_col else df[gst_col]
+
+    if party_name_col:
+        new_df["party"] = df[party_name_col]
+    else:
+        new_df["party"] = df[gst_col] if gst_col else ""
+
     new_df["taxable"] = df[tax_col] if tax_col else 0
     new_df["cgst"] = df[cgst_col] if cgst_col else 0
     new_df["sgst"] = df[sgst_col] if sgst_col else 0
@@ -153,11 +164,15 @@ def preprocess_pr(df):
     sgst_col = get_col(df, ["sgst"])
     igst_col = get_col(df, ["igst"])
 
+    # 🔥 PARTY NAME FIX
+    party_name_col = get_col(df, ["particular"])
+
     st.write("Detected PR Columns:", {
         "invoice": inv_col,
         "date": date_col,
         "gstin": gst_col,
-        "taxable": tax_col
+        "taxable": tax_col,
+        "party_name": party_name_col
     })
 
     if inv_col is None:
@@ -166,7 +181,12 @@ def preprocess_pr(df):
 
     new_df["invoice"] = df[inv_col]
     new_df["date"] = df[date_col] if date_col else ""
-    new_df["party"] = df[party_name_col] if party_name_col else df[gst_col]
+
+    if party_name_col:
+        new_df["party"] = df[party_name_col]
+    else:
+        new_df["party"] = df[gst_col] if gst_col else ""
+
     new_df["taxable"] = df[tax_col] if tax_col else 0
     new_df["cgst"] = df[cgst_col] if cgst_col else 0
     new_df["sgst"] = df[sgst_col] if sgst_col else 0
