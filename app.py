@@ -11,6 +11,28 @@ file_2b = st.file_uploader("Upload GSTR-2B File", type=["xlsx"])
 file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx","xls","csv"])
 
 # ---------------------------
+# 🔥 AI PARTY CLEANING
+# ---------------------------
+def clean_party_name(name):
+    if pd.isna(name):
+        return ""
+
+    name = str(name).upper()
+
+    remove_words = [
+        "PVT", "PRIVATE", "LTD", "LIMITED",
+        "LLP", "CO", "COMPANY", "INDIA"
+    ]
+
+    for word in remove_words:
+        name = name.replace(word, "")
+
+    name = re.sub(r'[^A-Z0-9]', '', name)
+
+    return name
+
+
+# ---------------------------
 # READ 2B FILE
 # ---------------------------
 def read_2b_file(file):
@@ -35,7 +57,7 @@ def read_2b_file(file):
 # ---------------------------
 def read_pr_file(file):
     try:
-        for i in range(20):  # increased range
+        for i in range(20):
             df = pd.read_excel(file, header=i)
             cols = [str(c).lower() for c in df.columns]
 
@@ -87,7 +109,9 @@ def clean_common(df):
     df["invoice_clean"] = df["invoice"].apply(clean_invoice)
 
     df["party"] = df["party"].astype(str)
-    df["party_clean"] = df["party"].str.replace(" ", "").str.upper()
+
+    # 🔥 AI PARTY MATCHING
+    df["party_clean"] = df["party"].apply(clean_party_name)
 
     # 🔥 SMART DATE HANDLING
     df["date"] = pd.to_datetime(
@@ -119,7 +143,6 @@ def preprocess_2b(df):
     sgst_col = get_col(df, ["state"])
     igst_col = get_col(df, ["integrated"])
 
-    # 🔥 PARTY NAME FIX
     party_name_col = get_col(df, ["trade", "legal", "name"])
 
     st.write("Detected 2B Columns:", {
@@ -164,7 +187,6 @@ def preprocess_pr(df):
     sgst_col = get_col(df, ["sgst"])
     igst_col = get_col(df, ["igst"])
 
-    # 🔥 PARTY NAME FIX
     party_name_col = get_col(df, ["particular"])
 
     st.write("Detected PR Columns:", {
