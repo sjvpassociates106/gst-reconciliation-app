@@ -18,13 +18,26 @@ def clean_party_name(name):
         return ""
 
     name = str(name).upper()
+
+    # remove brackets
     name = re.sub(r'\(.*?\)', '', name)
 
-    remove_words = ["PVT","PRIVATE","LTD","LIMITED","LLP","CO","COMPANY","INDIA"]
+    # 🔥 REMOVE BUSINESS WORDS
+    remove_words = [
+        "PVT","PRIVATE","LTD","LIMITED",
+        "LLP","CO","COMPANY","INDIA",
+        "TRADERS","TRADER",
+        "ENTERPRISE","ENTERPRISES",
+        "COMMISSION","CHARGES","CHARGE",
+        "EXPENSE","EXPENSES","FEES"
+    ]
+
     for word in remove_words:
         name = name.replace(word, "")
 
+    # remove symbols
     name = re.sub(r'[^A-Z0-9]', '', name)
+
     return name
 
 # ---------------------------
