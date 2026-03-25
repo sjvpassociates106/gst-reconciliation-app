@@ -237,19 +237,19 @@ def reconcile(df_pr, df_2b):
 
            status = "Matched"
 
-# 🔥 TAXABLE CHECK
+  TAXABLE CHECK
 if not is_close(pr["taxable"], r2["taxable"], 3):
     status = "Taxable Mismatch"
 
-# 🔥 CGST CHECK
+  CGST CHECK
 elif not is_close(pr["cgst"], r2["cgst"], 2):
     status = "CGST Mismatch"
 
-# 🔥 SGST CHECK
+ SGST CHECK
 elif not is_close(pr["sgst"], r2["sgst"], 2):
     status = "SGST Mismatch"
 
-# 🔥 IGST CHECK
+ IGST CHECK
 elif not is_close(pr["igst"], r2["igst"], 2):
     status = "IGST Mismatch"
 
