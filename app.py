@@ -5,24 +5,22 @@ import re
 st.title("GST Reconciliation (2B vs Purchase Register)")
 
 # ---------------------------
-# FILE UPLOAD
+# FILE UPLOAD (NO DUPLICATE ERROR)
 # ---------------------------
 file_2b = st.file_uploader("Upload GSTR-2B File", type=["xlsx"], key="file_2b")
 file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx","xls","csv"], key="file_pr")
 
+
 # ---------------------------
-# PARTY CLEANING
+# CLEAN PARTY
 # ---------------------------
 def clean_party_name(name):
     if pd.isna(name):
         return ""
 
     name = str(name).upper()
-
-    # remove brackets
     name = re.sub(r'\(.*?\)', '', name)
 
-    # 🔥 REMOVE BUSINESS WORDS
     remove_words = [
         "PVT","PRIVATE","LTD","LIMITED",
         "LLP","CO","COMPANY","INDIA",
@@ -35,13 +33,12 @@ def clean_party_name(name):
     for word in remove_words:
         name = name.replace(word, "")
 
-    # remove symbols
     name = re.sub(r'[^A-Z0-9]', '', name)
-
     return name
 
+
 # ---------------------------
-# INVOICE CLEANING
+# CLEAN INVOICE
 # ---------------------------
 def clean_invoice(inv):
     if pd.isna(inv):
@@ -51,18 +48,20 @@ def clean_invoice(inv):
     nums = re.findall(r'\d+', inv)
 
     if nums:
-        return nums[0]   # FIRST number
+        return nums[0]
 
     return ""
 
+
 # ---------------------------
-# TOLERANCE CHECK
+# TOLERANCE
 # ---------------------------
 def is_close(a, b, tol=3):
     try:
         return abs(float(a) - float(b)) <= tol
     except:
         return False
+
 
 # ---------------------------
 # READ FILES
@@ -80,6 +79,7 @@ def read_2b_file(file):
     st.error("❌ B2B sheet not found")
     st.stop()
 
+
 def read_pr_file(file):
     for i in range(20):
         try:
@@ -91,8 +91,9 @@ def read_pr_file(file):
 
     return pd.read_csv(file)
 
+
 # ---------------------------
-# COLUMN FINDER
+# FIND COLUMN
 # ---------------------------
 def get_col(df, keys):
     for col in df.columns:
@@ -101,21 +102,24 @@ def get_col(df, keys):
             return col
     return None
 
+
 # ---------------------------
 # COMMON CLEAN
 # ---------------------------
 def clean_common(df):
     df["invoice_clean"] = df["invoice"].apply(clean_invoice)
     df["party_clean"] = df["party"].apply(clean_party_name)
-    
+
+    # 🔥 GSTIN CLEAN
     df["gstin"] = df["gstin"].astype(str).str.strip().str.upper()
-    
+
     df["date"] = pd.to_datetime(df["date"], errors="coerce", dayfirst=True)
 
     for c in ["taxable","cgst","sgst","igst"]:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
     return df
+
 
 # ---------------------------
 # PREPROCESS 2B
@@ -134,12 +138,14 @@ def preprocess_2b(df):
     new["invoice"] = df[inv]
     new["date"] = df[date]
     new["party"] = df[party] if party else df[gst]
+    new["gstin"] = df[gst] if gst else ""   # 🔥 IMPORTANT
     new["taxable"] = df[tax]
     new["cgst"] = df[cgst] if cgst else 0
     new["sgst"] = df[sgst] if sgst else 0
     new["igst"] = df[igst] if igst else 0
 
     return clean_common(new)
+
 
 # ---------------------------
 # PREPROCESS PR
@@ -158,6 +164,7 @@ def preprocess_pr(df):
     new["invoice"] = df[inv]
     new["date"] = df[date]
     new["party"] = df[party] if party else df[gst]
+    new["gstin"] = df[gst] if gst else ""   # 🔥 IMPORTANT
     new["taxable"] = df[tax]
     new["cgst"] = df[cgst]
     new["sgst"] = df[sgst]
@@ -165,22 +172,24 @@ def preprocess_pr(df):
 
     return clean_common(new)
 
+
 # ---------------------------
 # RECONCILE
 # ---------------------------
 def reconcile(pr, b2b):
 
-    # 🔥 GROUP BOTH DATASETS
-    b2b = b2b.groupby(["party_clean","invoice_clean"], as_index=False).agg({
+    # 🔥 GROUP BOTH
+    b2b = b2b.groupby(["gstin","invoice_clean"], as_index=False).agg({
         "party":"first","invoice":"first","date":"first",
         "taxable":"sum","cgst":"sum","sgst":"sum","igst":"sum"
     })
 
-    pr = pr.groupby(["party_clean","invoice_clean"], as_index=False).agg({
+    pr = pr.groupby(["gstin","invoice_clean"], as_index=False).agg({
         "party":"first","invoice":"first","date":"first",
         "taxable":"sum","cgst":"sum","sgst":"sum","igst":"sum"
     })
 
+    # 🔥 GSTIN BASED KEY
     pr["key"] = pr["gstin"] + "_" + pr["invoice_clean"]
     b2b["key"] = b2b["gstin"] + "_" + b2b["invoice_clean"]
 
@@ -228,6 +237,7 @@ def reconcile(pr, b2b):
         })
 
     return pd.DataFrame(result)
+
 
 # ---------------------------
 # MAIN
