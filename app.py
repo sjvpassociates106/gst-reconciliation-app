@@ -181,8 +181,8 @@ def reconcile(pr, b2b):
         "taxable":"sum","cgst":"sum","sgst":"sum","igst":"sum"
     })
 
-   pr["key"] = pr["gstin"] + "_" + pr["invoice_clean"]
-   b2b["key"] = b2b["gstin"] + "_" + b2b["invoice_clean"]
+    pr["key"] = pr["gstin"] + "_" + pr["invoice_clean"]
+    b2b["key"] = b2b["gstin"] + "_" + b2b["invoice_clean"]
 
     result = []
 
