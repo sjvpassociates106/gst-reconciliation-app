@@ -5,7 +5,7 @@ import re
 st.title("GST Reconciliation (2B vs Purchase Register)")
 
 # ---------------------------
-# FILE UPLOAD (NO DUPLICATE ERROR)
+# FILE UPLOAD
 # ---------------------------
 file_2b = st.file_uploader("Upload GSTR-2B File", type=["xlsx"], key="file_2b")
 file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx","xls","csv"], key="file_pr")
@@ -110,7 +110,6 @@ def clean_common(df):
     df["invoice_clean"] = df["invoice"].apply(clean_invoice)
     df["party_clean"] = df["party"].apply(clean_party_name)
 
-    # 🔥 GSTIN CLEAN
     df["gstin"] = df["gstin"].astype(str).str.strip().str.upper()
 
     df["date"] = pd.to_datetime(df["date"], errors="coerce", dayfirst=True)
@@ -119,6 +118,20 @@ def clean_common(df):
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
     return df
+
+
+# ---------------------------
+# MAKE KEY (NO INDENT ERROR)
+# ---------------------------
+def make_key(df):
+    return df.apply(
+        lambda x: (
+            (x["gstin"] if str(x["gstin"]).strip() != "" else x["party_clean"])
+            + "_" +
+            x["invoice_clean"]
+        ),
+        axis=1
+    )
 
 
 # ---------------------------
@@ -138,7 +151,7 @@ def preprocess_2b(df):
     new["invoice"] = df[inv]
     new["date"] = df[date]
     new["party"] = df[party] if party else df[gst]
-    new["gstin"] = df[gst] if gst else ""   # 🔥 IMPORTANT
+    new["gstin"] = df[gst] if gst else ""
     new["taxable"] = df[tax]
     new["cgst"] = df[cgst] if cgst else 0
     new["sgst"] = df[sgst] if sgst else 0
@@ -164,7 +177,7 @@ def preprocess_pr(df):
     new["invoice"] = df[inv]
     new["date"] = df[date]
     new["party"] = df[party] if party else df[gst]
-    new["gstin"] = df[gst] if gst else ""   # 🔥 IMPORTANT
+    new["gstin"] = df[gst] if gst else ""
     new["taxable"] = df[tax]
     new["cgst"] = df[cgst]
     new["sgst"] = df[sgst]
@@ -178,7 +191,7 @@ def preprocess_pr(df):
 # ---------------------------
 def reconcile(pr, b2b):
 
-    # 🔥 GROUP BOTH
+    # GROUP BOTH
     b2b = b2b.groupby(["gstin","invoice_clean"], as_index=False).agg({
         "party":"first","invoice":"first","date":"first",
         "taxable":"sum","cgst":"sum","sgst":"sum","igst":"sum"
@@ -189,19 +202,9 @@ def reconcile(pr, b2b):
         "taxable":"sum","cgst":"sum","sgst":"sum","igst":"sum"
     })
 
-    # 🔥 GSTIN BASED KEY
-    def make_key(df):
-    return df.apply(
-        lambda x: (
-            (x["gstin"] if x["gstin"] != "" else x["party_clean"])
-            + "_" +
-            x["invoice_clean"]
-        ),
-        axis=1
-    )
-
-pr["key"] = make_key(pr)
-b2b["key"] = make_key(b2b)
+    # CREATE KEY (SAFE)
+    pr["key"] = make_key(pr)
+    b2b["key"] = make_key(b2b)
 
     result = []
 
