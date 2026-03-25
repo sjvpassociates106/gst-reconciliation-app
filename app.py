@@ -235,10 +235,23 @@ def reconcile(df_pr, df_2b):
             r2 = match.iloc[0]
             used_2b.add(r2["key"])
 
-            status = "Matched"
+           status = "Matched"
 
-            if abs(pr["taxable"] - r2["taxable"]) > 1:
-                status = "Taxable Mismatch"
+# 🔥 TAXABLE CHECK
+if not is_close(pr["taxable"], r2["taxable"], 3):
+    status = "Taxable Mismatch"
+
+# 🔥 CGST CHECK
+elif not is_close(pr["cgst"], r2["cgst"], 2):
+    status = "CGST Mismatch"
+
+# 🔥 SGST CHECK
+elif not is_close(pr["sgst"], r2["sgst"], 2):
+    status = "SGST Mismatch"
+
+# 🔥 IGST CHECK
+elif not is_close(pr["igst"], r2["igst"], 2):
+    status = "IGST Mismatch"
 
             result.append({
                 "Date PR": pr["date"],
