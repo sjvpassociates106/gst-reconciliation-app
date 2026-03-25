@@ -19,6 +19,10 @@ def clean_party_name(name):
 
     name = str(name).upper()
 
+    # 🔥 REMOVE BRACKETS CONTENT (VERY IMPORTANT)
+    name = re.sub(r'\(.*?\)', '', name)
+
+    # remove common words
     remove_words = [
         "PVT", "PRIVATE", "LTD", "LIMITED",
         "LLP", "CO", "COMPANY", "INDIA"
@@ -27,6 +31,7 @@ def clean_party_name(name):
     for word in remove_words:
         name = name.replace(word, "")
 
+    # remove special characters
     name = re.sub(r'[^A-Z0-9]', '', name)
 
     return name
