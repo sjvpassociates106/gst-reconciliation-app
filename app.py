@@ -203,8 +203,8 @@ def reconcile(pr, b2b):
     })
 
     # CREATE KEY (SAFE)
-    pr["key"] = pr["party_clean"] + "_" + pr["invoice_clean"]
-    b2b["key"] = b2b["party_clean"] + "_" + b2b["invoice_clean"]
+    pr["key"] = make_key(pr)
+    b2b["key"] = make_key(b2b)
 
     result = []
 
