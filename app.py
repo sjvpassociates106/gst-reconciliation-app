@@ -107,7 +107,7 @@ def get_col(df, keys):
 def clean_common(df):
     df["invoice_clean"] = df["invoice"].apply(clean_invoice)
     df["party_clean"] = df["party"].apply(clean_party_name)
-
+    df["gstin"] = df["gstin"].astype(str).str.strip().str.upper()
     df["date"] = pd.to_datetime(df["date"], errors="coerce", dayfirst=True)
 
     for c in ["taxable","cgst","sgst","igst"]:
@@ -179,8 +179,8 @@ def reconcile(pr, b2b):
         "taxable":"sum","cgst":"sum","sgst":"sum","igst":"sum"
     })
 
-    pr["key"] = pr["party_clean"] + "_" + pr["invoice_clean"]
-    b2b["key"] = b2b["party_clean"] + "_" + b2b["invoice_clean"]
+   pr["key"] = pr["gstin"] + "_" + pr["invoice_clean"]
+   b2b["key"] = b2b["gstin"] + "_" + b2b["invoice_clean"]
 
     result = []
 
