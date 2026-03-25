@@ -95,12 +95,16 @@ def get_col(df, keywords):
 def clean_invoice(inv):
     if pd.isna(inv):
         return ""
+
     inv = str(inv).upper()
+
+    # remove special chars
     inv = re.sub(r'[^A-Z0-9]', '', inv)
+
+    # remove year patterns
     inv = re.sub(r'20\d{2}', '', inv)
-    digits = re.findall(r'\d+', inv)
-    if digits:
-        return digits[-1][-3:]
+
+    # 🔥 KEEP FULL NUMBER (NOT LAST 3 DIGITS)
     return inv
 
 
