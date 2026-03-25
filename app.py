@@ -5,51 +5,42 @@ import re
 st.title("GST Reconciliation (2B vs Purchase Register)")
 
 # ---------------------------
-# FILE UPLOAD (FIXED KEY ERROR)
+# FILE UPLOAD
 # ---------------------------
 file_2b = st.file_uploader("Upload GSTR-2B File", type=["xlsx"], key="file_2b")
 file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx","xls","csv"], key="file_pr")
 
-
 # ---------------------------
-# PARTY CLEANING (AI MATCH)
+# PARTY CLEANING
 # ---------------------------
 def clean_party_name(name):
     if pd.isna(name):
         return ""
 
     name = str(name).upper()
-
-    # remove brackets
     name = re.sub(r'\(.*?\)', '', name)
 
-    # remove common words
     remove_words = ["PVT","PRIVATE","LTD","LIMITED","LLP","CO","COMPANY","INDIA"]
     for word in remove_words:
         name = name.replace(word, "")
 
-    # remove symbols
     name = re.sub(r'[^A-Z0-9]', '', name)
-
     return name
 
-
 # ---------------------------
-# INVOICE CLEANING (FINAL FIX)
+# INVOICE CLEANING
 # ---------------------------
 def clean_invoice(inv):
     if pd.isna(inv):
         return ""
 
     inv = str(inv).upper()
+    nums = re.findall(r'\d+', inv)
 
-    numbers = re.findall(r'\d+', inv)
-
-    if numbers:
-        return numbers[0]   # 🔥 IMPORTANT (first number)
+    if nums:
+        return nums[0]   # FIRST number
 
     return ""
-
 
 # ---------------------------
 # TOLERANCE CHECK
@@ -59,7 +50,6 @@ def is_close(a, b, tol=3):
         return abs(float(a) - float(b)) <= tol
     except:
         return False
-
 
 # ---------------------------
 # READ FILES
@@ -74,9 +64,8 @@ def read_2b_file(file):
                 if any("invoice" in str(c).lower() for c in df.columns):
                     return df
 
-    st.error("❌ B2B not found")
+    st.error("❌ B2B sheet not found")
     st.stop()
-
 
 def read_pr_file(file):
     for i in range(20):
@@ -89,7 +78,6 @@ def read_pr_file(file):
 
     return pd.read_csv(file)
 
-
 # ---------------------------
 # COLUMN FINDER
 # ---------------------------
@@ -100,9 +88,8 @@ def get_col(df, keys):
             return col
     return None
 
-
 # ---------------------------
-# COMMON CLEANING
+# COMMON CLEAN
 # ---------------------------
 def clean_common(df):
     df["invoice_clean"] = df["invoice"].apply(clean_invoice)
@@ -115,12 +102,10 @@ def clean_common(df):
 
     return df
 
-
 # ---------------------------
 # PREPROCESS 2B
 # ---------------------------
 def preprocess_2b(df):
-
     inv = get_col(df, ["invoice"])
     date = get_col(df, ["date"])
     party = get_col(df, ["trade","legal","name"])
@@ -141,12 +126,10 @@ def preprocess_2b(df):
 
     return clean_common(new)
 
-
 # ---------------------------
 # PREPROCESS PR
 # ---------------------------
 def preprocess_pr(df):
-
     inv = get_col(df, ["invoice","supplier"])
     date = get_col(df, ["date"])
     party = get_col(df, ["particular"])
@@ -167,13 +150,21 @@ def preprocess_pr(df):
 
     return clean_common(new)
 
-
 # ---------------------------
 # RECONCILE
 # ---------------------------
 def reconcile(pr, b2b):
 
-    b2b = b2b.drop_duplicates(subset=["party_clean","invoice_clean"])
+    # 🔥 GROUP BOTH DATASETS
+    b2b = b2b.groupby(["party_clean","invoice_clean"], as_index=False).agg({
+        "party":"first","invoice":"first","date":"first",
+        "taxable":"sum","cgst":"sum","sgst":"sum","igst":"sum"
+    })
+
+    pr = pr.groupby(["party_clean","invoice_clean"], as_index=False).agg({
+        "party":"first","invoice":"first","date":"first",
+        "taxable":"sum","cgst":"sum","sgst":"sum","igst":"sum"
+    })
 
     pr["key"] = pr["party_clean"] + "_" + pr["invoice_clean"]
     b2b["key"] = b2b["party_clean"] + "_" + b2b["invoice_clean"]
@@ -204,15 +195,24 @@ def reconcile(pr, b2b):
         result.append({
             "Party PR": r["party"],
             "Invoice PR": r["invoice"],
+            "Date PR": r["date"],
             "Taxable PR": r["taxable"],
+            "CGST PR": r["cgst"],
+            "SGST PR": r["sgst"],
+            "IGST PR": r["igst"],
+
             "Party 2B": b.get("party",""),
             "Invoice 2B": b.get("invoice",""),
+            "Date 2B": b.get("date",""),
             "Taxable 2B": b.get("taxable",""),
+            "CGST 2B": b.get("cgst",""),
+            "SGST 2B": b.get("sgst",""),
+            "IGST 2B": b.get("igst",""),
+
             "Status": status
         })
 
     return pd.DataFrame(result)
-
 
 # ---------------------------
 # MAIN
@@ -224,9 +224,12 @@ if file_2b and file_pr:
 
     result = reconcile(df_pr, df_2b)
 
-    st.success("✅ Done")
+    st.success("✅ Reconciliation Completed")
 
+    st.subheader("Summary")
     st.write(result["Status"].value_counts())
+
+    st.subheader("Output")
     st.dataframe(result)
 
-    st.download_button("Download CSV", result.to_csv(index=False), "result.csv")
+    st.download_button("Download CSV", result.to_csv(index=False), "gst_result.csv")
