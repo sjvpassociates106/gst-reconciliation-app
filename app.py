@@ -339,6 +339,8 @@ if file_2b and file_pr:
 
     df_2b = preprocess_2b(df_2b_raw)
     df_pr = preprocess_pr(df_pr_raw)
+    
+    df_2b = df_2b.drop_duplicates(subset=["party_clean", "invoice_clean"])
 
     result_df = reconcile(df_pr, df_2b)
 
