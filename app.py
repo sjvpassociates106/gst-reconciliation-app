@@ -202,14 +202,13 @@ def clean_invoice(inv):
 
     inv = str(inv).upper()
 
-    # 🔥 Extract ONLY numbers
+    # extract ONLY numbers
     numbers = re.findall(r'\d+', inv)
 
     if numbers:
-        return numbers[0]   # FIRST numeric part (IMPORTANT)
-
-    return ""
-
+        return numbers[-1]   # last numeric block (5988)
+    
+    return inv
 
 def clean_common(df):
     df["invoice"] = df["invoice"].astype(str)
