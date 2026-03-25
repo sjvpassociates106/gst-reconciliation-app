@@ -190,8 +190,18 @@ def reconcile(pr, b2b):
     })
 
     # 🔥 GSTIN BASED KEY
-    pr["key"] = pr["gstin"] + "_" + pr["invoice_clean"]
-    b2b["key"] = b2b["gstin"] + "_" + b2b["invoice_clean"]
+    def make_key(df):
+    return df.apply(
+        lambda x: (
+            (x["gstin"] if x["gstin"] != "" else x["party_clean"])
+            + "_" +
+            x["invoice_clean"]
+        ),
+        axis=1
+    )
+
+pr["key"] = make_key(pr)
+b2b["key"] = make_key(b2b)
 
     result = []
 
