@@ -220,6 +220,13 @@ def preprocess_pr(df):
 # ---------------------------
 # RECONCILIATION
 # ---------------------------
+def is_close(a, b, tol=3):
+    try:
+        return abs(float(a) - float(b)) <= tol
+    except:
+        return False
+
+
 def reconcile(df_pr, df_2b):
 
     df_pr["key"] = df_pr["party_clean"] + "_" + df_pr["invoice_clean"]
@@ -235,10 +242,21 @@ def reconcile(df_pr, df_2b):
             r2 = match.iloc[0]
             used_2b.add(r2["key"])
 
-          status = "Matched"
+            # ✅ DEFAULT
+            status = "Matched"
 
-if abs(pr["taxable"] - r2["taxable"]) > 1:
-    status = "Taxable Mismatch"
+            # 🔥 TOLERANCE LOGIC (FINAL FIX)
+            if not is_close(pr["taxable"], r2["taxable"], 3):
+                status = "Taxable Mismatch"
+
+            elif not is_close(pr["cgst"], r2["cgst"], 2):
+                status = "CGST Mismatch"
+
+            elif not is_close(pr["sgst"], r2["sgst"], 2):
+                status = "SGST Mismatch"
+
+            elif not is_close(pr["igst"], r2["igst"], 2):
+                status = "IGST Mismatch"
 
             result.append({
                 "Date PR": pr["date"],
@@ -281,6 +299,7 @@ if abs(pr["taxable"] - r2["taxable"]) > 1:
                 "Status": "Not in 2B"
             })
 
+    # Remaining 2B
     for _, r2 in df_2b.iterrows():
         if r2["key"] not in used_2b:
             result.append({
