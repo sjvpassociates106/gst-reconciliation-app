@@ -14,18 +14,20 @@ file_pr = st.file_uploader("Upload Purchase Register", type=["xlsx","xls","csv"]
 # ---------------------------
 # CLEAN PARTY
 # ---------------------------
-def clean_party_name(name):
+
+    def clean_party_name(name):
     if pd.isna(name):
         return ""
 
     name = str(name).upper()
+
+    # remove brackets
     name = re.sub(r'\(.*?\)', '', name)
 
+    # 🔥 ONLY REMOVE LEGAL WORDS (NOT BUSINESS WORDS)
     remove_words = [
         "PVT","PRIVATE","LTD","LIMITED",
         "LLP","CO","COMPANY","INDIA",
-        "TRADERS","TRADER",
-        "ENTERPRISE","ENTERPRISES",
         "COMMISSION","CHARGES","CHARGE",
         "EXPENSE","EXPENSES","FEES"
     ]
@@ -33,7 +35,9 @@ def clean_party_name(name):
     for word in remove_words:
         name = name.replace(word, "")
 
+    # remove symbols & spaces
     name = re.sub(r'[^A-Z0-9]', '', name)
+
     return name
 
 
