@@ -19,8 +19,6 @@ def clean_party_name(name):
         return ""
 
     name = str(name).upper()
-
-    # remove brackets
     name = re.sub(r'\(.*?\)', '', name)
 
     remove_words = [
@@ -36,8 +34,6 @@ def clean_party_name(name):
     name = re.sub(r'[^A-Z0-9]', '', name)
 
     return name
-
-    
 
 
 # ---------------------------
@@ -124,7 +120,7 @@ def clean_common(df):
 
 
 # ---------------------------
-# MAKE KEY (NO INDENT ERROR)
+# MAKE KEY
 # ---------------------------
 def make_key(df):
     return df.apply(
@@ -155,7 +151,7 @@ def preprocess_2b(df):
     new["date"] = df[date]
     new["party"] = df[party] if party else df[gst]
     new["gstin"] = df[gst] if gst else ""
-    new["taxable"] = df[tax]
+    new["taxable"] = df[tax] if tax else 0
     new["cgst"] = df[cgst] if cgst else 0
     new["sgst"] = df[sgst] if sgst else 0
     new["igst"] = df[igst] if igst else 0
@@ -171,20 +167,20 @@ def preprocess_pr(df):
     date = get_col(df, ["date"])
     party = get_col(df, ["particular"])
     gst = get_col(df, ["gstin"])
-    tax = get_col(df, ["taxable"])
-    cgst = get_col(df, ["cgst"])
-    sgst = get_col(df, ["sgst"])
-    igst = get_col(df, ["igst"])
+    tax = get_col(df, ["taxable","value","amount"])
+    cgst = get_col(df, ["cgst","central"])
+    sgst = get_col(df, ["sgst","state"])
+    igst = get_col(df, ["igst","integrated"])
 
     new = pd.DataFrame()
     new["invoice"] = df[inv]
     new["date"] = df[date]
     new["party"] = df[party] if party else df[gst]
     new["gstin"] = df[gst] if gst else ""
-    new["taxable"] = df[tax]
-    new["cgst"] = df[cgst]
-    new["sgst"] = df[sgst]
-    new["igst"] = df[igst]
+    new["taxable"] = df[tax] if tax else 0
+    new["cgst"] = df[cgst] if cgst else 0
+    new["sgst"] = df[sgst] if sgst else 0
+    new["igst"] = df[igst] if igst else 0
 
     return clean_common(new)
 
@@ -205,12 +201,15 @@ def reconcile(pr, b2b):
         "taxable":"sum","cgst":"sum","sgst":"sum","igst":"sum"
     })
 
-    # CREATE KEY (SAFE)
+    # KEY
     pr["key"] = make_key(pr)
     b2b["key"] = make_key(b2b)
 
     result = []
 
+    # ---------------------------
+    # PR → 2B
+    # ---------------------------
     for _, r in pr.iterrows():
         m = b2b[b2b["key"] == r["key"]]
 
@@ -251,6 +250,34 @@ def reconcile(pr, b2b):
 
             "Status": status
         })
+
+    # ---------------------------
+    # 2B → PR (NEW ADD)
+    # ---------------------------
+    pr_keys = set(pr["key"])
+
+    for _, b in b2b.iterrows():
+        if b["key"] not in pr_keys:
+
+            result.append({
+                "Party PR": "",
+                "Invoice PR": "",
+                "Date PR": "",
+                "Taxable PR": "",
+                "CGST PR": "",
+                "SGST PR": "",
+                "IGST PR": "",
+
+                "Party 2B": b["party"],
+                "Invoice 2B": b["invoice"],
+                "Date 2B": b["date"],
+                "Taxable 2B": b["taxable"],
+                "CGST 2B": b["cgst"],
+                "SGST 2B": b["sgst"],
+                "IGST 2B": b["igst"],
+
+                "Status": "Not in Purchase Register"
+            })
 
     return pd.DataFrame(result)
 
