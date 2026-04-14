@@ -171,7 +171,7 @@ def preprocess_pr(df):
     date = get_col(df, ["date"])
     party = get_col(df, ["particular"])
     gst = get_col(df, ["gstin"])
-    tax = get_col(df, ["taxable","value","amount"])
+    tax = get_col(df, ["taxable"])
     cgst = get_col(df, ["cgst"])
     sgst = get_col(df, ["sgst"])
     igst = get_col(df, ["igst"])
@@ -181,7 +181,7 @@ def preprocess_pr(df):
     new["date"] = df[date]
     new["party"] = df[party] if party else df[gst]
     new["gstin"] = df[gst] if gst else ""
-    new["taxable"] = df[tax] if tax else 0
+    new["taxable"] = df[tax]
     new["cgst"] = df[cgst]
     new["sgst"] = df[sgst]
     new["igst"] = df[igst]
